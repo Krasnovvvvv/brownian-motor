@@ -11,13 +11,9 @@ set(CMAKE_AUTORCC ON)
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 find_package(Matplot++ CONFIG REQUIRED)
 
-add_executable(brownian-motor main.cpp)
-
-#[[target_sources(brownian-motor PRIVATE
-        src/Simulation.cpp
-        src/Plotter.cpp
-        src/Integrator.cpp
-)]]
+add_executable(brownian-motor
+        main.cpp
+)
 
 target_include_directories(brownian-motor PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -26,4 +22,12 @@ target_include_directories(brownian-motor PRIVATE
 target_link_libraries(brownian-motor PRIVATE
         Qt6::Widgets
         Matplot++::cimg
-        Matplot++::matplot)
+        Matplot++::matplot
+)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(brownian-motor PRIVATE
+            $<$<CONFIG:Release>:-O3>
+            $<$<CONFIG:Release>:-march=native>
+    )
+endif()
