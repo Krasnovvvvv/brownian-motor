@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.28)
+
 project(brownian-motor)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
@@ -13,6 +15,12 @@ find_package(Matplot++ CONFIG REQUIRED)
 
 add_executable(brownian-motor
         main.cpp
+
+        include/gui/MainWindow.h
+        src/gui/MainWindow.cpp
+
+        include/gui/SimulationWorker.h
+        src/gui/SimulationWorker.cpp
 )
 
 target_include_directories(brownian-motor PRIVATE
@@ -21,6 +29,7 @@ target_include_directories(brownian-motor PRIVATE
 
 target_link_libraries(brownian-motor PRIVATE
         Qt6::Widgets
+
         Matplot++::cimg
         Matplot++::matplot
 )
