@@ -21,26 +21,27 @@
 #include <thread>
 
 #include "gui/SimulationWorker.h"
+#include "gui/CompactDoubleSpinBox.h"
 
 namespace {
 
-[[nodiscard]] QDoubleSpinBox* make_double_spin_box(
-    double minimum,
-    double maximum,
-    double value,
-    int decimals,
-    double step
-) {
-    auto* spin_box = new QDoubleSpinBox;
+    [[nodiscard]] CompactDoubleSpinBox* make_double_spin_box(
+        double minimum,
+        double maximum,
+        double value,
+        int decimals,
+        double step
+    ) {
+        auto* spin_box = new CompactDoubleSpinBox;
 
-    spin_box->setRange(minimum, maximum);
-    spin_box->setValue(value);
-    spin_box->setDecimals(decimals);
-    spin_box->setSingleStep(step);
-    spin_box->setKeyboardTracking(false);
+        spin_box->setRange(minimum, maximum);
+        spin_box->setValue(value);
+        spin_box->setDecimals(decimals);
+        spin_box->setSingleStep(step);
+        spin_box->setKeyboardTracking(false);
 
-    return spin_box;
-}
+        return spin_box;
+    }
 
 [[nodiscard]] QSpinBox* make_spin_box(
     int minimum,
@@ -111,7 +112,7 @@ void MainWindow::create_interface_() {
     v1_spin_ = make_double_spin_box(
         -100.0,
         100.0,
-        0.10,
+        0.2,
         8,
         0.01
     );
@@ -119,7 +120,7 @@ void MainWindow::create_interface_() {
     v2_spin_ = make_double_spin_box(
         -100.0,
         100.0,
-        0.025,
+        0.1,
         8,
         0.01
     );
@@ -147,14 +148,14 @@ void MainWindow::create_interface_() {
     epsilon_spin_ = make_double_spin_box(
         1.0e-8,
         1'000.0,
-        0.10,
+        0.075,
         8,
         0.01
     );
 
     alpha_spin_ = make_double_spin_box(
-        -100.0,
-        100.0,
+        -1.0,
+        1.0,
         -1.0 / 3.0,
         8,
         0.01
@@ -174,7 +175,7 @@ void MainWindow::create_interface_() {
     dt_spin_ = make_double_spin_box(
         1.0e-8,
         1.0,
-        1.0e-3,
+        0.001,
         10,
         1.0e-4
     );

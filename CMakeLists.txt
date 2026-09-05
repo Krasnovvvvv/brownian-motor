@@ -21,6 +21,8 @@ add_executable(brownian-motor
 
         include/gui/SimulationWorker.h
         src/gui/SimulationWorker.cpp
+
+        include/gui/CompactDoubleSpinBox.h
 )
 
 target_include_directories(brownian-motor PRIVATE
