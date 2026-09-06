@@ -2,7 +2,9 @@
 #define BROWNIAN_MOTOR_MAINWINDOW_H
 #pragma once
 
+#include <QElapsedTimer>
 #include <QMainWindow>
+#include <QTimer>
 
 #include <memory>
 #include <stop_token>
@@ -13,6 +15,7 @@ class QPlainTextEdit;
 class QPushButton;
 class QSpinBox;
 class QThread;
+class QProgressBar;
 
 class SimulationWorker;
 struct SimulationRequest;
@@ -27,6 +30,11 @@ private:
     void connect_controls_();
 
     [[nodiscard]] SimulationRequest request_from_controls_() const;
+    [[nodiscard]] bool validate_request_(
+                       const SimulationRequest& request,
+                       QString& error_message) const;
+
+    void update_elapsed_time_();
 
     void start_simulation_();
     void cancel_simulation_();
@@ -53,6 +61,8 @@ private:
     QPushButton* cancel_button_{nullptr};
 
     QLabel* status_label_{nullptr};
+    QProgressBar* progress_bar_{nullptr};
+    QLabel* elapsed_live_label_{nullptr};
 
     QLabel* velocity_value_label_{nullptr};
     QLabel* final_x_value_label_{nullptr};
@@ -66,6 +76,9 @@ private:
     SimulationWorker* simulation_worker_{nullptr};
 
     std::shared_ptr<std::stop_source> cancellation_source_;
+
+    QTimer elapsed_timer_;
+    QElapsedTimer elapsed_clock_;
 };
 
 #endif // BROWNIAN_MOTOR_MAINWINDOW_H

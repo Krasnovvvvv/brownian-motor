@@ -7,7 +7,9 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QThread>
@@ -20,28 +22,28 @@
 #include <memory>
 #include <thread>
 
-#include "gui/SimulationWorker.h"
 #include "gui/CompactDoubleSpinBox.h"
+#include "gui/SimulationWorker.h"
 
 namespace {
 
-    [[nodiscard]] CompactDoubleSpinBox* make_double_spin_box(
-        double minimum,
-        double maximum,
-        double value,
-        int decimals,
-        double step
-    ) {
-        auto* spin_box = new CompactDoubleSpinBox;
+[[nodiscard]] CompactDoubleSpinBox* make_double_spin_box(
+    double minimum,
+    double maximum,
+    double value,
+    int decimals,
+    double step
+) {
+    auto* spin_box = new CompactDoubleSpinBox;
 
-        spin_box->setRange(minimum, maximum);
-        spin_box->setValue(value);
-        spin_box->setDecimals(decimals);
-        spin_box->setSingleStep(step);
-        spin_box->setKeyboardTracking(false);
+    spin_box->setRange(minimum, maximum);
+    spin_box->setValue(value);
+    spin_box->setDecimals(decimals);
+    spin_box->setSingleStep(step);
+    spin_box->setKeyboardTracking(false);
 
-        return spin_box;
-    }
+    return spin_box;
+}
 
 [[nodiscard]] QSpinBox* make_spin_box(
     int minimum,
@@ -76,6 +78,17 @@ MainWindow::MainWindow(QWidget* parent)
 {
     create_interface_();
     connect_controls_();
+
+    elapsed_timer_.setInterval(250);
+
+    connect(
+        &elapsed_timer_,
+        &QTimer::timeout,
+        this,
+        [this] {
+            update_elapsed_time_();
+        }
+    );
 
     setWindowTitle("Brownian Motor");
     resize(900, 680);
@@ -245,6 +258,14 @@ void MainWindow::create_interface_() {
     run_button_ = new QPushButton{"Run simulation"};
     cancel_button_ = new QPushButton{"Cancel"};
 
+    progress_bar_ = new QProgressBar;
+    progress_bar_->setTextVisible(false);
+    progress_bar_->setFixedWidth(180);
+    progress_bar_->setVisible(false);
+
+    elapsed_live_label_ = new QLabel{"Elapsed: —"};
+    elapsed_live_label_->setMinimumWidth(140);
+
     cancel_button_->setEnabled(false);
 
     status_label_ = new QLabel{"Ready"};
@@ -255,6 +276,8 @@ void MainWindow::create_interface_() {
 
     controls_layout->addWidget(run_button_);
     controls_layout->addWidget(cancel_button_);
+    controls_layout->addWidget(progress_bar_);
+    controls_layout->addWidget(elapsed_live_label_);
     controls_layout->addSpacing(16);
     controls_layout->addWidget(status_label_);
     controls_layout->addStretch();
@@ -394,6 +417,70 @@ SimulationRequest MainWindow::request_from_controls_() const {
     };
 }
 
+bool MainWindow::validate_request_(
+    const SimulationRequest& request,
+    QString& error_message
+) const {
+    if (request.dt <= 0.0) {
+        error_message = "dt must be greater than zero.";
+        return false;
+    }
+
+    if (request.total_time <= 0.0) {
+        error_message = "Total time must be greater than zero.";
+        return false;
+    }
+
+    const std::size_t total_steps =
+        static_cast<std::size_t>(
+            request.total_time / request.dt
+        );
+
+    if (total_steps == 0) {
+        error_message =
+            "Total time / dt must produce at least one physical step.";
+        return false;
+    }
+
+    if (request.burn_in_steps >= total_steps) {
+        error_message = QString{
+            "Burn-in steps (%1) must be smaller than the "
+            "total number of physical steps (%2)."
+        }
+            .arg(
+                static_cast<qulonglong>(
+                    request.burn_in_steps
+                )
+            )
+            .arg(
+                static_cast<qulonglong>(
+                    total_steps
+                )
+            );
+
+        return false;
+    }
+
+    return true;
+}
+
+void MainWindow::update_elapsed_time_() {
+    if (!elapsed_clock_.isValid()) {
+        elapsed_live_label_->setText("Elapsed: —");
+        return;
+    }
+
+    const double elapsed_seconds =
+        static_cast<double>(
+            elapsed_clock_.elapsed()
+        ) / 1000.0;
+
+    elapsed_live_label_->setText(
+        QString{"Elapsed: %1 s"}
+            .arg(elapsed_seconds, 0, 'f', 1)
+    );
+}
+
 void MainWindow::start_simulation_() {
     if (simulation_thread_) {
         return;
@@ -401,6 +488,31 @@ void MainWindow::start_simulation_() {
 
     const SimulationRequest request =
         request_from_controls_();
+
+    QString validation_error;
+
+    if (!validate_request_(request, validation_error)) {
+        QMessageBox::warning(
+            this,
+            "Invalid simulation parameters",
+            validation_error
+        );
+
+        append_log_(
+            QString{"Start rejected: %1"}
+                .arg(validation_error)
+        );
+
+        return;
+    }
+
+    const std::size_t total_steps =
+        static_cast<std::size_t>(
+            request.total_time / request.dt
+        );
+
+    const std::size_t total_updates =
+        request.n_particles * total_steps;
 
     cancellation_source_ =
         std::make_shared<std::stop_source>();
@@ -434,6 +546,17 @@ void MainWindow::start_simulation_() {
             double throughput,
             std::size_t workers
         ) {
+            elapsed_timer_.stop();
+
+            elapsed_live_label_->setText(
+                QString{"Elapsed: %1 s"}
+                    .arg(elapsed_seconds, 0, 'f', 3)
+            );
+
+            progress_bar_->setRange(0, 100);
+            progress_bar_->setValue(100);
+            progress_bar_->setVisible(false);
+
             velocity_value_label_->setText(
                 QString::number(
                     mean_velocity,
@@ -505,6 +628,13 @@ void MainWindow::start_simulation_() {
         &SimulationWorker::failed,
         this,
         [this](const QString& message) {
+            elapsed_timer_.stop();
+
+            progress_bar_->setRange(0, 100);
+            progress_bar_->setValue(0);
+            progress_bar_->setVisible(false);
+
+            elapsed_live_label_->setText("Elapsed: —");
             status_label_->setText("Failed");
 
             append_log_(
@@ -533,6 +663,16 @@ void MainWindow::start_simulation_() {
         &QThread::finished,
         this,
         [this] {
+            elapsed_timer_.stop();
+
+            progress_bar_->setRange(0, 100);
+            progress_bar_->setValue(0);
+            progress_bar_->setVisible(false);
+
+            if (elapsed_clock_.isValid()) {
+                elapsed_clock_.invalidate();
+            }
+
             simulation_thread_->deleteLater();
 
             simulation_thread_ = nullptr;
@@ -577,7 +717,32 @@ void MainWindow::start_simulation_() {
             )
     );
 
+    append_log_(
+        QString{
+            "Work estimate: %1 physical steps, "
+            "%2 particle updates."
+        }
+            .arg(
+                static_cast<qulonglong>(
+                    total_steps
+                )
+            )
+            .arg(
+                static_cast<qulonglong>(
+                    total_updates
+                )
+            )
+    );
+
     set_running_state_(true);
+
+    progress_bar_->setRange(0, 0);
+    progress_bar_->setVisible(true);
+
+    elapsed_live_label_->setText("Elapsed: 0.0 s");
+    elapsed_clock_.start();
+    elapsed_timer_.start();
+
     simulation_thread_->start();
 }
 
@@ -589,6 +754,7 @@ void MainWindow::cancel_simulation_() {
     cancellation_source_->request_stop();
 
     cancel_button_->setEnabled(false);
+
     status_label_->setText(
         "Cancellation requested..."
     );
