@@ -9,13 +9,14 @@
 #include <memory>
 #include <stop_token>
 
+class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
 class QPlainTextEdit;
+class QProgressBar;
 class QPushButton;
 class QSpinBox;
 class QThread;
-class QProgressBar;
 
 class SimulationWorker;
 struct SimulationRequest;
@@ -30,15 +31,16 @@ private:
     void connect_controls_();
 
     [[nodiscard]] SimulationRequest request_from_controls_() const;
-    [[nodiscard]] bool validate_request_(
-                       const SimulationRequest& request,
-                       QString& error_message) const;
 
-    void update_elapsed_time_();
+    [[nodiscard]] bool validate_request_(
+        const SimulationRequest& request,
+        QString& error_message
+    ) const;
 
     void start_simulation_();
     void cancel_simulation_();
 
+    void update_elapsed_time_();
     void set_running_state_(bool is_running);
     void append_log_(const QString& message);
 
@@ -57,11 +59,14 @@ private:
     QSpinBox* seed_spin_{nullptr};
     QSpinBox* workers_spin_{nullptr};
 
+    QComboBox* mode_combo_{nullptr};
+
     QPushButton* run_button_{nullptr};
     QPushButton* cancel_button_{nullptr};
 
-    QLabel* status_label_{nullptr};
     QProgressBar* progress_bar_{nullptr};
+
+    QLabel* status_label_{nullptr};
     QLabel* elapsed_live_label_{nullptr};
 
     QLabel* velocity_value_label_{nullptr};

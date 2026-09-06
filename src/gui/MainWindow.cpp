@@ -1,5 +1,6 @@
 #include "gui/MainWindow.h"
 
+#include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QFrame>
@@ -17,6 +18,7 @@
 #include <QWidget>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -91,11 +93,11 @@ MainWindow::MainWindow(QWidget* parent)
     );
 
     setWindowTitle("Brownian Motor");
-    resize(900, 680);
+    resize(980, 680);
 
     append_log_(
-        "Ready. The current mode runs the optimized "
-        "headless fast solver in a background thread."
+        "Ready. Fast mode is optimized for final calculations. "
+        "Interactive mode provides real progress and live observables."
     );
 }
 
@@ -123,19 +125,11 @@ void MainWindow::create_interface_() {
     auto* potential_form = new QFormLayout{potential_group};
 
     v1_spin_ = make_double_spin_box(
-        -100.0,
-        100.0,
-        0.2,
-        8,
-        0.01
+        -100.0, 100.0, 0.2, 8, 0.01
     );
 
     v2_spin_ = make_double_spin_box(
-        -100.0,
-        100.0,
-        0.1,
-        8,
-        0.01
+        -100.0, 100.0, 0.1, 8, 0.01
     );
 
     potential_form->addRow("V1:", v1_spin_);
@@ -151,27 +145,15 @@ void MainWindow::create_interface_() {
     };
 
     amplitude_spin_ = make_double_spin_box(
-        1.0e-8,
-        1'000.0,
-        1.0,
-        8,
-        0.1
+        1.0e-8, 1'000.0, 1.0, 8, 0.1
     );
 
     epsilon_spin_ = make_double_spin_box(
-        1.0e-8,
-        1'000.0,
-        0.075,
-        8,
-        0.01
+        1.0e-8, 1'000.0, 0.075, 8, 0.01
     );
 
     alpha_spin_ = make_double_spin_box(
-        -1.0,
-        1.0,
-        -1.0 / 3.0,
-        8,
-        0.01
+        -1.0, 1.0, -1.0 / 3.0, 8, 0.01
     );
 
     modulation_form->addRow("Amplitude:", amplitude_spin_);
@@ -186,39 +168,23 @@ void MainWindow::create_interface_() {
     };
 
     dt_spin_ = make_double_spin_box(
-        1.0e-8,
-        1.0,
-        0.001,
-        10,
-        1.0e-4
+        1.0e-8, 1.0, 0.001, 10, 1.0e-4
     );
 
     total_time_spin_ = make_double_spin_box(
-        1.0e-6,
-        1'000'000.0,
-        100.0,
-        6,
-        10.0
+        1.0e-6, 1'000'000.0, 100.0, 6, 10.0
     );
 
     particles_spin_ = make_spin_box(
-        1,
-        10'000'000,
-        2'000,
-        1'000
+        1, 10'000'000, 2'000, 1'000
     );
 
     burn_in_spin_ = make_spin_box(
-        0,
-        2'000'000'000,
-        10'000,
-        1'000
+        0, 2'000'000'000, 10'000, 1'000
     );
 
     seed_spin_ = make_spin_box(
-        0,
-        2'147'483'647,
-        42
+        0, 2'147'483'647, 42
     );
 
     const std::size_t hardware_threads =
@@ -244,6 +210,25 @@ void MainWindow::create_interface_() {
             )
     );
 
+    mode_combo_ = new QComboBox;
+
+    mode_combo_->addItem(
+        "Fast: final result only",
+        false
+    );
+
+    mode_combo_->addItem(
+        "Interactive: progress and live data",
+        true
+    );
+
+    mode_combo_->setToolTip(
+        "Fast mode avoids intermediate ensemble reductions.\n"
+        "Interactive mode calculates in batches and provides "
+        "real progress updates."
+    );
+
+    simulation_form->addRow("Mode:", mode_combo_);
     simulation_form->addRow("dt:", dt_spin_);
     simulation_form->addRow("Total time:", total_time_spin_);
     simulation_form->addRow("Particles:", particles_spin_);
@@ -259,8 +244,7 @@ void MainWindow::create_interface_() {
     cancel_button_ = new QPushButton{"Cancel"};
 
     progress_bar_ = new QProgressBar;
-    progress_bar_->setTextVisible(false);
-    progress_bar_->setFixedWidth(180);
+    progress_bar_->setFixedWidth(210);
     progress_bar_->setVisible(false);
 
     elapsed_live_label_ = new QLabel{"Elapsed: —"};
@@ -272,19 +256,19 @@ void MainWindow::create_interface_() {
     status_label_->setFrameStyle(
         QFrame::Panel | QFrame::Sunken
     );
-    status_label_->setMinimumWidth(300);
+    status_label_->setMinimumWidth(330);
 
     controls_layout->addWidget(run_button_);
     controls_layout->addWidget(cancel_button_);
     controls_layout->addWidget(progress_bar_);
     controls_layout->addWidget(elapsed_live_label_);
-    controls_layout->addSpacing(16);
+    controls_layout->addSpacing(12);
     controls_layout->addWidget(status_label_);
     controls_layout->addStretch();
 
     root_layout->addLayout(controls_layout);
 
-    auto* results_group = new QGroupBox{"Fast-solver result"};
+    auto* results_group = new QGroupBox{"Result"};
     auto* results_layout = new QGridLayout{results_group};
 
     velocity_value_label_ = make_result_label();
@@ -294,58 +278,38 @@ void MainWindow::create_interface_() {
     workers_value_label_ = make_result_label();
 
     results_layout->addWidget(
-        new QLabel{"Mean velocity:"},
-        0,
-        0
+        new QLabel{"Mean velocity:"}, 0, 0
     );
     results_layout->addWidget(
-        velocity_value_label_,
-        0,
-        1
+        velocity_value_label_, 0, 1
     );
 
     results_layout->addWidget(
-        new QLabel{"<x_final>:"},
-        1,
-        0
+        new QLabel{"<x_final>:"}, 1, 0
     );
     results_layout->addWidget(
-        final_x_value_label_,
-        1,
-        1
+        final_x_value_label_, 1, 1
     );
 
     results_layout->addWidget(
-        new QLabel{"Elapsed time:"},
-        0,
-        2
+        new QLabel{"Elapsed time:"}, 0, 2
     );
     results_layout->addWidget(
-        elapsed_value_label_,
-        0,
-        3
+        elapsed_value_label_, 0, 3
     );
 
     results_layout->addWidget(
-        new QLabel{"Throughput:"},
-        1,
-        2
+        new QLabel{"Throughput:"}, 1, 2
     );
     results_layout->addWidget(
-        throughput_value_label_,
-        1,
-        3
+        throughput_value_label_, 1, 3
     );
 
     results_layout->addWidget(
-        new QLabel{"Workers used:"},
-        2,
-        0
+        new QLabel{"Workers used:"}, 2, 0
     );
     results_layout->addWidget(
-        workers_value_label_,
-        2,
-        1
+        workers_value_label_, 2, 1
     );
 
     root_layout->addWidget(results_group);
@@ -382,6 +346,9 @@ void MainWindow::connect_controls_() {
 }
 
 SimulationRequest MainWindow::request_from_controls_() const {
+    const bool interactive_mode =
+        mode_combo_->currentData().toBool();
+
     return SimulationRequest{
         .v1 = v1_spin_->value(),
         .v2 = v2_spin_->value(),
@@ -413,7 +380,9 @@ SimulationRequest MainWindow::request_from_controls_() const {
             workers_spin_->value()
         ),
 
-        .cancellation_check_steps = 4'096
+        .batch_steps = 3'500,
+        .cancellation_check_steps = 4'096,
+        .interactive_mode = interactive_mode
     };
 }
 
@@ -537,6 +506,48 @@ void MainWindow::start_simulation_() {
 
     connect(
         simulation_worker_,
+        &SimulationWorker::progress_updated,
+        this,
+        [this](
+            qulonglong completed_steps,
+            qulonglong total_steps_value,
+            double time,
+            double mean_x,
+            double mean_velocity
+        ) {
+            if (total_steps_value == 0) {
+                return;
+            }
+
+            const double fraction =
+                static_cast<double>(completed_steps) /
+                static_cast<double>(total_steps_value);
+
+            const int progress_percent =
+                static_cast<int>(
+                    std::lround(100.0 * fraction)
+                );
+
+            progress_bar_->setRange(0, 100);
+            progress_bar_->setValue(
+                std::clamp(progress_percent, 0, 100)
+            );
+
+            status_label_->setText(
+                QString{
+                    "Running: %1% | t = %2 | <x> = %3 | v = %4"
+                }
+                    .arg(progress_percent)
+                    .arg(time, 0, 'g', 8)
+                    .arg(mean_x, 0, 'e', 4)
+                    .arg(mean_velocity, 0, 'e', 4)
+            );
+        },
+        Qt::QueuedConnection
+    );
+
+    connect(
+        simulation_worker_,
         &SimulationWorker::completed,
         this,
         [this](
@@ -575,22 +586,12 @@ void MainWindow::start_simulation_() {
 
             elapsed_value_label_->setText(
                 QString{"%1 s"}
-                    .arg(
-                        elapsed_seconds,
-                        0,
-                        'f',
-                        3
-                    )
+                    .arg(elapsed_seconds, 0, 'f', 3)
             );
 
             throughput_value_label_->setText(
                 QString{"%1 M updates/s"}
-                    .arg(
-                        throughput,
-                        0,
-                        'f',
-                        3
-                    )
+                    .arg(throughput, 0, 'f', 3)
             );
 
             workers_value_label_->setText(
@@ -690,14 +691,21 @@ void MainWindow::start_simulation_() {
     workers_value_label_->setText("Running...");
 
     status_label_->setText(
-        "Running optimized fast solver..."
+        request.interactive_mode
+            ? "Starting interactive solver..."
+            : "Starting optimized fast solver..."
     );
 
     append_log_(
         QString{
-            "Run started: particles = %1, T = %2, dt = %3, "
-            "seed = %4, workers = %5"
+            "Run started: mode = %1, particles = %2, "
+            "T = %3, dt = %4, seed = %5, workers = %6"
         }
+            .arg(
+                request.interactive_mode
+                    ? "interactive"
+                    : "fast"
+            )
             .arg(
                 static_cast<qulonglong>(
                     request.n_particles
@@ -736,7 +744,16 @@ void MainWindow::start_simulation_() {
 
     set_running_state_(true);
 
-    progress_bar_->setRange(0, 0);
+    if (request.interactive_mode) {
+        progress_bar_->setRange(0, 100);
+        progress_bar_->setValue(0);
+        progress_bar_->setTextVisible(true);
+        progress_bar_->setFormat("%p %");
+    } else {
+        progress_bar_->setRange(0, 0);
+        progress_bar_->setTextVisible(false);
+    }
+
     progress_bar_->setVisible(true);
 
     elapsed_live_label_->setText("Elapsed: 0.0 s");
@@ -768,6 +785,8 @@ void MainWindow::cancel_simulation_() {
 void MainWindow::set_running_state_(bool is_running) {
     run_button_->setEnabled(!is_running);
     cancel_button_->setEnabled(is_running);
+
+    mode_combo_->setEnabled(!is_running);
 
     v1_spin_->setEnabled(!is_running);
     v2_spin_->setEnabled(!is_running);

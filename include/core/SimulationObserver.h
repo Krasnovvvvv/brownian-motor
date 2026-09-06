@@ -4,7 +4,7 @@
 
 #include <functional>
 
-#include "SimulationUpdate.h"
+#include "core/SimulationUpdate.h"
 
 using SimulationObserver = std::function<void(const SimulationUpdate&)>;
 

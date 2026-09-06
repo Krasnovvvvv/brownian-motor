@@ -9,6 +9,7 @@
 #include "core/EnsembleResult.h"
 #include "core/Potential.h"
 #include "core/SeedFactory.h"
+#include "core/SimulationObserver.h"
 #include "core/SimulationParams.h"
 #include "modulations/DichotomicParams.h"
 #include "modulations/ModulationFactory.h"
@@ -30,13 +31,27 @@ void SimulationWorker::run() {
         const SimulationParams simulation_params{
             .dt = request_.dt,
             .total_time = request_.total_time,
+
             .n_particles = request_.n_particles,
             .burn_in_steps = request_.burn_in_steps,
+
             .x0 = request_.x0,
-            .store_trajectory = false,
-            .trajectory_stride = 1'000,
-            .live_update_stride = 1'000,
-            .batch_steps = 3'500,
+
+            /*
+             * Trajectory нужна только interactive path.
+             * Fast mode сохраняет прежнее условие:
+             * store_trajectory = false.
+             */
+            .store_trajectory = request_.interactive_mode,
+
+            /*
+             * В interactive solver одна точка пока создаётся
+             * после каждого batch.
+             */
+            .trajectory_stride = request_.batch_steps,
+            .live_update_stride = request_.batch_steps,
+            .batch_steps = request_.batch_steps,
+
             .cancellation_check_steps =
                 request_.cancellation_check_steps
         };
@@ -76,11 +91,35 @@ void SimulationWorker::run() {
         const auto started_at =
             std::chrono::steady_clock::now();
 
-        const EnsembleResult result =
-            solver.solve_stochastic_fast(
+        EnsembleResult result;
+
+        if (request_.interactive_mode) {
+            const SimulationObserver observer =
+                [this](const SimulationUpdate& update) {
+                    emit progress_updated(
+                        static_cast<qulonglong>(
+                            update.step + 1
+                        ),
+                        static_cast<qulonglong>(
+                            update.total_steps
+                        ),
+                        update.time,
+                        update.mean_x,
+                        update.mean_velocity
+                    );
+                };
+
+            result = solver.solve_stochastic_interactive(
+                modulations,
+                observer,
+                cancellation_source_->get_token()
+            );
+        } else {
+            result = solver.solve_stochastic_fast(
                 modulations,
                 cancellation_source_->get_token()
             );
+        }
 
         const auto finished_at =
             std::chrono::steady_clock::now();
@@ -128,7 +167,9 @@ void SimulationWorker::run() {
             workers
         );
     } catch (const std::exception& exception) {
-        emit failed(QString::fromUtf8(exception.what()));
+        emit failed(
+            QString::fromUtf8(exception.what())
+        );
     }
 
     emit finished();

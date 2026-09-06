@@ -3,6 +3,7 @@
 #pragma once
 
 #include <QObject>
+#include <QtGlobal>
 
 #include <cstddef>
 #include <cstdint>
@@ -14,7 +15,7 @@ struct SimulationRequest final {
     double v2{0.025};
 
     double modulation_amplitude{1.0};
-    double epsilon{0.075};
+    double epsilon{0.10};
     double alpha{-1.0 / 3.0};
 
     double dt{1.0e-3};
@@ -28,7 +29,10 @@ struct SimulationRequest final {
     std::uint32_t seed{42u};
     std::size_t requested_workers{0};
 
+    std::size_t batch_steps{3'500};
     std::size_t cancellation_check_steps{4'096};
+
+    bool interactive_mode{false};
 };
 
 class SimulationWorker final : public QObject {
@@ -45,13 +49,25 @@ public slots:
     void run();
 
     signals:
-        void completed(
-            double mean_velocity,
-            double mean_x_final,
-            double elapsed_seconds,
-            double throughput,
-            std::size_t workers
+        /*
+         * Этот сигнал испускается только в interactive mode,
+         * один раз на завершённый batch.
+         */
+        void progress_updated(
+            qulonglong completed_steps,
+            qulonglong total_steps,
+            double time,
+            double mean_x,
+            double mean_velocity
         );
+
+    void completed(
+        double mean_velocity,
+        double mean_x_final,
+        double elapsed_seconds,
+        double throughput,
+        std::size_t workers
+    );
 
     void failed(const QString& message);
 
