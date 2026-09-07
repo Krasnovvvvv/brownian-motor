@@ -20,6 +20,7 @@ class QThread;
 
 class SimulationWorker;
 struct SimulationRequest;
+class TrajectoryPlotWidget;
 
 class MainWindow final : public QMainWindow {
 public:
@@ -76,6 +77,7 @@ private:
     QLabel* workers_value_label_{nullptr};
 
     QPlainTextEdit* log_output_{nullptr};
+    TrajectoryPlotWidget* trajectory_plot_{nullptr};
 
     QThread* simulation_thread_{nullptr};
     SimulationWorker* simulation_worker_{nullptr};

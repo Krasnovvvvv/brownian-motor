@@ -23,6 +23,9 @@ add_executable(brownian-motor
         src/gui/SimulationWorker.cpp
 
         include/gui/CompactDoubleSpinBox.h
+
+        include/gui/TrajectoryPlotWidget.h
+        src/gui/TrajectoryPlotWidget.cpp
 )
 
 target_include_directories(brownian-motor PRIVATE

@@ -26,6 +26,7 @@
 
 #include "gui/CompactDoubleSpinBox.h"
 #include "gui/SimulationWorker.h"
+#include "gui/TrajectoryPlotWidget.h"
 
 namespace {
 
@@ -314,6 +315,23 @@ void MainWindow::create_interface_() {
 
     root_layout->addWidget(results_group);
 
+    auto* trajectory_group =
+    new QGroupBox{"Live trajectory"};
+
+    auto* trajectory_layout =
+        new QVBoxLayout{trajectory_group};
+
+    trajectory_plot_ = new TrajectoryPlotWidget;
+
+    trajectory_layout->addWidget(
+        trajectory_plot_
+    );
+
+    root_layout->addWidget(
+        trajectory_group,
+        1
+    );
+
     auto* log_group = new QGroupBox{"Log"};
     auto* log_layout = new QVBoxLayout{log_group};
 
@@ -486,6 +504,8 @@ void MainWindow::start_simulation_() {
     cancellation_source_ =
         std::make_shared<std::stop_source>();
 
+    trajectory_plot_->clear_points();
+
     simulation_thread_ = new QThread{this};
 
     simulation_worker_ = new SimulationWorker{
@@ -541,6 +561,11 @@ void MainWindow::start_simulation_() {
                     .arg(time, 0, 'g', 8)
                     .arg(mean_x, 0, 'e', 4)
                     .arg(mean_velocity, 0, 'e', 4)
+            );
+
+            trajectory_plot_->append_point(
+                time,
+                mean_x
             );
         },
         Qt::QueuedConnection
