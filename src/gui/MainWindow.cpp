@@ -16,6 +16,7 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QSizePolicy>
 #include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -107,17 +108,211 @@ MainWindow::MainWindow(QWidget* parent)
     trajectory_dialog_->installEventFilter(this);
 
     auto* trajectory_layout =
-        new QVBoxLayout{trajectory_dialog_};
+        new QHBoxLayout{trajectory_dialog_};
+
+    trajectory_layout->setContentsMargins(
+        10,
+        10,
+        10,
+        10
+    );
+
+    trajectory_layout->setSpacing(10);
 
     trajectory_plot_ = new TrajectoryPlotWidget{
         trajectory_dialog_
     };
 
-    trajectory_layout->addWidget(
-        trajectory_plot_
+    auto* analysis_panel = new QGroupBox{
+        "Trend analysis",
+        trajectory_dialog_
+    };
+
+    analysis_panel->setFixedWidth(250);
+
+    auto* analysis_layout = new QVBoxLayout{
+        analysis_panel
+    };
+
+    analysis_layout->setSpacing(8);
+
+    select_trend_button_ = new QPushButton{
+        "Select trend start",
+        analysis_panel
+    };
+
+    select_trend_button_->setToolTip(
+        "Choose the first point used for the linear "
+        "regression after the simulation has completed."
     );
 
+    clear_trend_button_ = new QPushButton{
+        "Clear trend",
+        analysis_panel
+    };
+
+    clear_trend_button_->setToolTip(
+        "Remove the selected trend or cancel point selection."
+    );
+
+    trend_info_label_ = new QLabel{
+        "Trend: available after simulation completes",
+        analysis_panel
+    };
+
+    trend_info_label_->setWordWrap(true);
+    trend_info_label_->setMinimumHeight(84);
+    trend_info_label_->setAlignment(
+        Qt::AlignLeft | Qt::AlignTop
+    );
+
+    analysis_layout->addWidget(
+        select_trend_button_
+    );
+
+    analysis_layout->addWidget(
+        clear_trend_button_
+    );
+
+    analysis_layout->addSpacing(8);
+
+    analysis_layout->addWidget(
+        trend_info_label_
+    );
+
+    analysis_layout->addStretch(1);
+
+    trajectory_layout->addWidget(
+        trajectory_plot_,
+        1
+    );
+
+    trajectory_layout->addWidget(
+        analysis_panel
+    );
+
+    connect(
+    select_trend_button_,
+    &QPushButton::clicked,
+    this,
+    [this] {
+        begin_trend_selection_();
+    }
+);
+
+connect(
+    clear_trend_button_,
+    &QPushButton::clicked,
+    this,
+    [this] {
+        clear_trend_();
+    }
+);
+
+connect(
+    trajectory_plot_,
+    &TrajectoryPlotWidget::point_count_changed,
+    this,
+    [this](std::size_t) {
+        update_plot_tools_();
+    }
+);
+
+connect(
+    trajectory_plot_,
+    &TrajectoryPlotWidget::trend_selection_requested,
+    this,
+    [this] {
+        select_trend_button_->setText(
+            "Click a point on graph..."
+        );
+
+        trend_info_label_->setText(
+            "Trend: click the first point "
+            "of the regression range"
+        );
+
+        update_plot_tools_();
+    }
+);
+
+connect(
+    trajectory_plot_,
+    &TrajectoryPlotWidget::trend_changed,
+    this,
+    [this](
+        double start_time,
+        double intercept,
+        double slope,
+        double r_squared
+    ) {
+        Q_UNUSED(intercept);
+
+        select_trend_button_->setText(
+            "Select trend start"
+        );
+
+        trend_info_label_->setText(
+            QString{
+                "Trend fitted from:\n"
+                "t₀ = %1\n"
+                "v = %2\n"
+                "R² = %3"
+            }
+                .arg(start_time, 0, 'g', 6)
+                .arg(slope, 0, 'e', 4)
+                .arg(r_squared, 0, 'f', 4)
+        );
+
+        update_plot_tools_();
+    }
+);
+
+connect(
+    trajectory_plot_,
+    &TrajectoryPlotWidget::trend_cleared,
+    this,
+    [this] {
+        select_trend_button_->setText(
+            "Select trend start"
+        );
+
+        if (simulation_completed_) {
+            trend_info_label_->setText(
+                "Trend: not calculated"
+            );
+        } else {
+            trend_info_label_->setText(
+                "Trend: available after "
+                "simulation completes"
+            );
+        }
+
+        update_plot_tools_();
+    }
+);
+
+connect(
+    trajectory_plot_,
+    &TrajectoryPlotWidget::trend_selection_failed,
+    this,
+    [this](const QString& message) {
+        select_trend_button_->setText(
+            "Select trend start"
+        );
+
+        QMessageBox::information(
+            trajectory_dialog_,
+            "Trend selection",
+            message
+        );
+
+        update_plot_tools_();
+    }
+);
+
     update_show_graph_button_();
+    update_plot_tools_();
 
     elapsed_timer_.setInterval(250);
 
@@ -551,7 +746,31 @@ void MainWindow::start_simulation_() {
     cancellation_source_ =
         std::make_shared<std::stop_source>();
 
-    trajectory_plot_->clear_points();
+    simulation_completed_ = false;
+
+    if (request.interactive_mode) {
+        trajectory_plot_->clear_points();
+
+        trend_info_label_->setText(
+            "Trend: available after simulation completes"
+        );
+
+        select_trend_button_->setText(
+            "Select trend start"
+        );
+    } else {
+        trajectory_plot_->clear_trend();
+
+        trend_info_label_->setText(
+            "Trend: unavailable in Fast mode"
+        );
+
+        select_trend_button_->setText(
+            "Select trend start"
+        );
+    }
+
+    update_plot_tools_();
 
     update_show_graph_button_();
 
@@ -630,7 +849,7 @@ void MainWindow::start_simulation_() {
         simulation_worker_,
         &SimulationWorker::completed,
         this,
-        [this](
+        [this, request](
             double mean_velocity,
             double mean_x_final,
             double elapsed_seconds,
@@ -684,6 +903,9 @@ void MainWindow::start_simulation_() {
                 cancellation_source_ &&
                 cancellation_source_->stop_requested();
 
+            simulation_completed_ =
+                request.interactive_mode;
+
             status_label_->setText(
                 was_cancelled
                     ? "Cancelled: partial result returned"
@@ -701,6 +923,21 @@ void MainWindow::start_simulation_() {
                     .arg(elapsed_seconds, 0, 'f', 3)
                     .arg(throughput, 0, 'f', 3)
             );
+
+            if (request.interactive_mode) {
+                trend_info_label_->setText(
+                    was_cancelled
+                        ? "Trend: partial trajectory, "
+                          "select a start point"
+                        : "Trend: select a start point"
+                );
+            } else {
+                trend_info_label_->setText(
+                    "Trend: unavailable in Fast mode"
+                );
+            }
+
+            update_plot_tools_();
 
             update_show_graph_button_();
         }
@@ -724,6 +961,17 @@ void MainWindow::start_simulation_() {
                 QString{"Simulation failed: %1"}
                     .arg(message)
             );
+
+            simulation_completed_ = false;
+
+            trajectory_plot_->clear_trend();
+
+            trend_info_label_->setText(
+                "Trend: unavailable because "
+                  "the simulation failed"
+            );
+
+            update_plot_tools_();
 
             update_show_graph_button_();
         }
@@ -878,6 +1126,52 @@ void MainWindow::show_trajectory_window_() {
     update_show_graph_button_();
 }
 
+void MainWindow::begin_trend_selection_() {
+    if (
+        !simulation_completed_ ||
+        !trajectory_plot_
+    ) {
+        return;
+    }
+
+    trajectory_plot_->begin_trend_selection();
+}
+
+void MainWindow::clear_trend_() {
+    if (!trajectory_plot_) {
+        return;
+    }
+
+    trajectory_plot_->clear_trend();
+}
+
+void MainWindow::update_plot_tools_() {
+    if (
+        !trajectory_plot_ ||
+        !select_trend_button_ ||
+        !clear_trend_button_
+    ) {
+        return;
+    }
+
+    const bool trend_is_available =
+        simulation_completed_ &&
+        trajectory_plot_->point_count() >= 3;
+
+    select_trend_button_->setEnabled(
+        trend_is_available &&
+        !trajectory_plot_->is_selecting_trend_start()
+    );
+
+    clear_trend_button_->setEnabled(
+        trend_is_available &&
+        (
+            trajectory_plot_->has_trend() ||
+            trajectory_plot_->is_selecting_trend_start()
+        )
+    );
+}
+
 void MainWindow::update_show_graph_button_() {
     const bool interactive_mode =
         mode_combo_->currentData().toBool();
@@ -921,7 +1215,6 @@ bool MainWindow::eventFilter(
 void MainWindow::set_running_state_(bool is_running) {
     run_button_->setEnabled(!is_running);
     cancel_button_->setEnabled(is_running);
-    update_show_graph_button_();
 
     mode_combo_->setEnabled(!is_running);
 
@@ -939,6 +1232,9 @@ void MainWindow::set_running_state_(bool is_running) {
     burn_in_spin_->setEnabled(!is_running);
     seed_spin_->setEnabled(!is_running);
     workers_spin_->setEnabled(!is_running);
+
+    update_show_graph_button_();
+    update_plot_tools_();
 }
 
 void MainWindow::append_log_(

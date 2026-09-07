@@ -63,9 +63,16 @@ TrajectoryPlotWidget::TrajectoryPlotWidget(
 
 void TrajectoryPlotWidget::clear_points() {
     points_.clear();
+
     hovered_index_.reset();
     selecting_trend_start_ = false;
     trend_ = {};
+
+    unsetCursor();
+
+    emit point_count_changed(0);
+    emit trend_cleared();
+
     update();
 }
 
@@ -86,10 +93,17 @@ void TrajectoryPlotWidget::append_point(
     if (points_.size() > maximum_points) {
         points_.erase(points_.begin());
 
-        if (trend_.valid && trend_.start_index > 0) {
-            --trend_.start_index;
+        if (trend_.valid) {
+            if (trend_.start_index > 0) {
+                --trend_.start_index;
+            } else {
+                trend_ = {};
+                emit trend_cleared();
+            }
         }
     }
+
+    emit point_count_changed(points_.size());
 
     update();
 }
@@ -130,6 +144,14 @@ void TrajectoryPlotWidget::clear_trend() {
 
 bool TrajectoryPlotWidget::has_trend() const {
     return trend_.valid;
+}
+
+bool TrajectoryPlotWidget::is_selecting_trend_start() const {
+    return selecting_trend_start_;
+}
+
+std::size_t TrajectoryPlotWidget::point_count() const {
+    return points_.size();
 }
 
 TrajectoryPlotWidget::LinearTrend
@@ -686,45 +708,6 @@ void TrajectoryPlotWidget::paintEvent(
         painter.drawLine(
             map_to_plot_(trend_start, bounds),
             map_to_plot_(trend_end, bounds)
-        );
-
-        const QPointF selected_screen_point =
-            map_to_plot_(start_data_point, bounds);
-
-        painter.setPen(
-            QPen{
-                QColor{"#F2B134"},
-                1.5,
-                Qt::DashLine
-            }
-        );
-
-        painter.drawLine(
-            QPointF{
-                selected_screen_point.x(),
-                plot_rect.top()
-            },
-            QPointF{
-                selected_screen_point.x(),
-                plot_rect.bottom()
-            }
-        );
-
-        painter.setBrush(
-            QColor{"#F2B134"}
-        );
-
-        painter.setPen(
-            QPen{
-                palette().color(QPalette::Base),
-                1.5
-            }
-        );
-
-        painter.drawEllipse(
-            selected_screen_point,
-            5.0,
-            5.0
         );
     }
 

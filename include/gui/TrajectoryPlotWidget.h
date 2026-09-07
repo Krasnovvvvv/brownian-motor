@@ -10,6 +10,7 @@
 #include <optional>
 #include <vector>
 
+class QEvent;
 class QMouseEvent;
 class QPaintEvent;
 
@@ -39,17 +40,29 @@ public:
     void clear_trend();
 
     [[nodiscard]] bool has_trend() const;
+
+    [[nodiscard]] bool is_selecting_trend_start() const;
+
+    [[nodiscard]] std::size_t point_count() const;
+
     [[nodiscard]] LinearTrend trend() const;
 
 signals:
+    void point_count_changed(
+        std::size_t count
+    );
+
     void trend_selection_requested();
+
     void trend_changed(
         double start_time,
         double intercept,
         double slope,
         double r_squared
     );
+
     void trend_cleared();
+
     void trend_selection_failed(
         const QString& message
     );
@@ -95,6 +108,7 @@ private:
     std::vector<QPointF> points_;
 
     std::optional<std::size_t> hovered_index_;
+
     bool selecting_trend_start_{false};
 
     LinearTrend trend_;

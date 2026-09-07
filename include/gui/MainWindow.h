@@ -12,6 +12,7 @@
 class QComboBox;
 class QDoubleSpinBox;
 class QDialog;
+class QEvent;
 class QLabel;
 class QPlainTextEdit;
 class QProgressBar;
@@ -28,6 +29,12 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
+protected:
+    bool eventFilter(
+        QObject* watched,
+        QEvent* event
+    ) override;
+
 private:
     void create_interface_();
     void connect_controls_();
@@ -41,8 +48,13 @@ private:
 
     void start_simulation_();
     void cancel_simulation_();
+
     void show_trajectory_window_();
     void update_show_graph_button_();
+
+    void begin_trend_selection_();
+    void clear_trend_();
+    void update_plot_tools_();
 
     void update_elapsed_time_();
     void set_running_state_(bool is_running);
@@ -69,6 +81,9 @@ private:
     QPushButton* cancel_button_{nullptr};
     QPushButton* show_graph_button_{nullptr};
 
+    QPushButton* select_trend_button_{nullptr};
+    QPushButton* clear_trend_button_{nullptr};
+
     QProgressBar* progress_bar_{nullptr};
 
     QLabel* status_label_{nullptr};
@@ -80,7 +95,10 @@ private:
     QLabel* throughput_value_label_{nullptr};
     QLabel* workers_value_label_{nullptr};
 
+    QLabel* trend_info_label_{nullptr};
+
     QPlainTextEdit* log_output_{nullptr};
+
     QDialog* trajectory_dialog_{nullptr};
     TrajectoryPlotWidget* trajectory_plot_{nullptr};
 
@@ -89,14 +107,10 @@ private:
 
     std::shared_ptr<std::stop_source> cancellation_source_;
 
+    bool simulation_completed_{false};
+
     QTimer elapsed_timer_;
     QElapsedTimer elapsed_clock_;
-
-protected:
-    bool eventFilter(
-        QObject* watched,
-        QEvent* event
-    ) override;
 };
 
 #endif // BROWNIAN_MOTOR_MAINWINDOW_H
