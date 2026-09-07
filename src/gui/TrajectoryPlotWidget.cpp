@@ -141,7 +141,7 @@ void TrajectoryPlotWidget::paintEvent(
 
     if (points_.empty()) {
         painter.setPen(
-            palette().color(QPalette::Mid)
+            QColor{0x8FA3B8}
         );
 
         painter.drawText(
@@ -234,7 +234,11 @@ void TrajectoryPlotWidget::paintEvent(
     const double time_padding = 0.03 * time_range;
     const double x_padding = 0.10 * x_range;
 
-    minimum_time -= time_padding;
+    minimum_time = std::max(
+        0.0,
+        minimum_time - time_padding
+    );
+
     maximum_time += time_padding;
 
     minimum_x -= x_padding;

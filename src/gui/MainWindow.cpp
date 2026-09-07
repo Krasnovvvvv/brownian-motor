@@ -4,6 +4,7 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QDialog>
+#include <QEvent>
 #include <QFormLayout>
 #include <QFrame>
 #include <QGridLayout>
@@ -16,6 +17,7 @@
 #include <QPushButton>
 #include <QSpinBox>
 #include <QThread>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -84,7 +86,7 @@ MainWindow::MainWindow(QWidget* parent)
     create_interface_();
     connect_controls_();
 
-    trajectory_dialog_ = new QDialog{this};
+    trajectory_dialog_ = new QDialog{nullptr};
 
     trajectory_dialog_->setWindowFlags(
     Qt::Window |
@@ -102,6 +104,7 @@ MainWindow::MainWindow(QWidget* parent)
     trajectory_dialog_->setModal(false);
 
     trajectory_dialog_->resize(900, 540);
+    trajectory_dialog_->installEventFilter(this);
 
     auto* trajectory_layout =
         new QVBoxLayout{trajectory_dialog_};
@@ -113,6 +116,8 @@ MainWindow::MainWindow(QWidget* parent)
     trajectory_layout->addWidget(
         trajectory_plot_
     );
+
+    update_show_graph_button_();
 
     elapsed_timer_.setInterval(250);
 
@@ -143,6 +148,9 @@ MainWindow::~MainWindow() {
         simulation_thread_->quit();
         simulation_thread_->wait();
     }
+
+    delete trajectory_dialog_;
+    trajectory_dialog_ = nullptr;
 }
 
 void MainWindow::create_interface_() {
@@ -276,6 +284,9 @@ void MainWindow::create_interface_() {
     run_button_ = new QPushButton{"Run simulation"};
     cancel_button_ = new QPushButton{"Cancel"};
 
+    show_graph_button_ = new QPushButton{"Show graph"};
+    show_graph_button_->setEnabled(false);
+
     progress_bar_ = new QProgressBar;
     progress_bar_->setFixedWidth(210);
     progress_bar_->setVisible(false);
@@ -293,6 +304,7 @@ void MainWindow::create_interface_() {
 
     controls_layout->addWidget(run_button_);
     controls_layout->addWidget(cancel_button_);
+    controls_layout->addWidget(show_graph_button_);
     controls_layout->addWidget(progress_bar_);
     controls_layout->addWidget(elapsed_live_label_);
     controls_layout->addSpacing(12);
@@ -374,6 +386,26 @@ void MainWindow::connect_controls_() {
         this,
         [this] {
             cancel_simulation_();
+        }
+    );
+
+    connect(
+    show_graph_button_,
+    &QPushButton::clicked,
+    this,
+    [this] {
+        show_trajectory_window_();
+    }
+    );
+
+    connect(
+        mode_combo_,
+        QOverload<int>::of(
+            &QComboBox::currentIndexChanged
+        ),
+        this,
+        [this](int) {
+            update_show_graph_button_();
         }
     );
 }
@@ -521,10 +553,10 @@ void MainWindow::start_simulation_() {
 
     trajectory_plot_->clear_points();
 
+    update_show_graph_button_();
+
     if (request.interactive_mode) {
-        trajectory_dialog_->show();
-        trajectory_dialog_->raise();
-        trajectory_dialog_->activateWindow();
+        show_trajectory_window_();
     } else {
         trajectory_dialog_->hide();
     }
@@ -669,6 +701,8 @@ void MainWindow::start_simulation_() {
                     .arg(elapsed_seconds, 0, 'f', 3)
                     .arg(throughput, 0, 'f', 3)
             );
+
+            update_show_graph_button_();
         }
     );
 
@@ -690,6 +724,8 @@ void MainWindow::start_simulation_() {
                 QString{"Simulation failed: %1"}
                     .arg(message)
             );
+
+            update_show_graph_button_();
         }
     );
 
@@ -830,9 +866,62 @@ void MainWindow::cancel_simulation_() {
     );
 }
 
+void MainWindow::show_trajectory_window_() {
+    if (!trajectory_dialog_) {
+        return;
+    }
+
+    trajectory_dialog_->show();
+    trajectory_dialog_->raise();
+    trajectory_dialog_->activateWindow();
+
+    update_show_graph_button_();
+}
+
+void MainWindow::update_show_graph_button_() {
+    const bool interactive_mode =
+        mode_combo_->currentData().toBool();
+
+    const bool graph_is_hidden =
+        trajectory_dialog_ &&
+        !trajectory_dialog_->isVisible();
+
+    show_graph_button_->setEnabled(
+        interactive_mode &&
+        graph_is_hidden
+    );
+}
+
+bool MainWindow::eventFilter(
+    QObject* watched,
+    QEvent* event
+) {
+    if (
+        watched == trajectory_dialog_ &&
+        (
+            event->type() == QEvent::Show ||
+            event->type() == QEvent::Hide
+        )
+    ) {
+        QTimer::singleShot(
+            0,
+            this,
+            [this] {
+                update_show_graph_button_();
+            }
+        );
+    }
+
+    return QMainWindow::eventFilter(
+        watched,
+        event
+    );
+}
+
 void MainWindow::set_running_state_(bool is_running) {
     run_button_->setEnabled(!is_running);
     cancel_button_->setEnabled(is_running);
+    update_show_graph_button_();
 
     mode_combo_->setEnabled(!is_running);
 

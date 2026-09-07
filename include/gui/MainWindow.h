@@ -41,6 +41,8 @@ private:
 
     void start_simulation_();
     void cancel_simulation_();
+    void show_trajectory_window_();
+    void update_show_graph_button_();
 
     void update_elapsed_time_();
     void set_running_state_(bool is_running);
@@ -65,6 +67,7 @@ private:
 
     QPushButton* run_button_{nullptr};
     QPushButton* cancel_button_{nullptr};
+    QPushButton* show_graph_button_{nullptr};
 
     QProgressBar* progress_bar_{nullptr};
 
@@ -88,6 +91,12 @@ private:
 
     QTimer elapsed_timer_;
     QElapsedTimer elapsed_clock_;
+
+protected:
+    bool eventFilter(
+        QObject* watched,
+        QEvent* event
+    ) override;
 };
 
 #endif // BROWNIAN_MOTOR_MAINWINDOW_H
