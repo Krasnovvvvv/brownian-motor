@@ -1,7 +1,9 @@
 #include "gui/MainWindow.h"
 
+#include <Qt>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QDialog>
 #include <QFormLayout>
 #include <QFrame>
 #include <QGridLayout>
@@ -81,6 +83,36 @@ MainWindow::MainWindow(QWidget* parent)
 {
     create_interface_();
     connect_controls_();
+
+    trajectory_dialog_ = new QDialog{this};
+
+    trajectory_dialog_->setWindowFlags(
+    Qt::Window |
+    Qt::WindowTitleHint |
+    Qt::WindowSystemMenuHint |
+    Qt::WindowMinimizeButtonHint |
+    Qt::WindowMaximizeButtonHint |
+    Qt::WindowCloseButtonHint
+);
+
+    trajectory_dialog_->setWindowTitle(
+        "Mean position trajectory"
+    );
+
+    trajectory_dialog_->setModal(false);
+
+    trajectory_dialog_->resize(900, 540);
+
+    auto* trajectory_layout =
+        new QVBoxLayout{trajectory_dialog_};
+
+    trajectory_plot_ = new TrajectoryPlotWidget{
+        trajectory_dialog_
+    };
+
+    trajectory_layout->addWidget(
+        trajectory_plot_
+    );
 
     elapsed_timer_.setInterval(250);
 
@@ -315,23 +347,6 @@ void MainWindow::create_interface_() {
 
     root_layout->addWidget(results_group);
 
-    auto* trajectory_group =
-    new QGroupBox{"Live trajectory"};
-
-    auto* trajectory_layout =
-        new QVBoxLayout{trajectory_group};
-
-    trajectory_plot_ = new TrajectoryPlotWidget;
-
-    trajectory_layout->addWidget(
-        trajectory_plot_
-    );
-
-    root_layout->addWidget(
-        trajectory_group,
-        1
-    );
-
     auto* log_group = new QGroupBox{"Log"};
     auto* log_layout = new QVBoxLayout{log_group};
 
@@ -505,6 +520,14 @@ void MainWindow::start_simulation_() {
         std::make_shared<std::stop_source>();
 
     trajectory_plot_->clear_points();
+
+    if (request.interactive_mode) {
+        trajectory_dialog_->show();
+        trajectory_dialog_->raise();
+        trajectory_dialog_->activateWindow();
+    } else {
+        trajectory_dialog_->hide();
+    }
 
     simulation_thread_ = new QThread{this};
 

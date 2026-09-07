@@ -11,6 +11,7 @@
 
 class QComboBox;
 class QDoubleSpinBox;
+class QDialog;
 class QLabel;
 class QPlainTextEdit;
 class QProgressBar;
@@ -77,6 +78,7 @@ private:
     QLabel* workers_value_label_{nullptr};
 
     QPlainTextEdit* log_output_{nullptr};
+    QDialog* trajectory_dialog_{nullptr};
     TrajectoryPlotWidget* trajectory_plot_{nullptr};
 
     QThread* simulation_thread_{nullptr};

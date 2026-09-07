@@ -438,14 +438,52 @@ void TrajectoryPlotWidget::paintEvent(
 QString TrajectoryPlotWidget::format_value_(
     double value
 ) {
+    if (!std::isfinite(value)) {
+        return "?";
+    }
+
+    if (std::abs(value) < 1.0e-12) {
+        value = 0.0;
+    }
+
     const double magnitude = std::abs(value);
 
     if (
-        magnitude != 0.0 &&
-        (magnitude < 0.001 || magnitude >= 10'000.0)
+        magnitude >= 10'000.0 ||
+        (magnitude > 0.0 && magnitude < 0.001)
     ) {
         return QString::number(value, 'e', 2);
     }
 
-    return QString::number(value, 'g', 5);
+    int decimals = 0;
+
+    if (magnitude < 0.01) {
+        decimals = 4;
+    } else if (magnitude < 0.1) {
+        decimals = 3;
+    } else if (magnitude < 1.0) {
+        decimals = 2;
+    } else if (magnitude < 10.0) {
+        decimals = 2;
+    } else if (magnitude < 100.0) {
+        decimals = 1;
+    }
+
+    QString text = QString::number(
+        value,
+        'f',
+        decimals
+    );
+
+    if (text.contains('.')) {
+        while (text.endsWith('0')) {
+            text.chop(1);
+        }
+
+        if (text.endsWith('.')) {
+            text.chop(1);
+        }
+    }
+
+    return text;
 }
