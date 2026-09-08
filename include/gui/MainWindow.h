@@ -18,6 +18,7 @@ class QPlainTextEdit;
 class QProgressBar;
 class QPushButton;
 class QSpinBox;
+class QString;
 class QThread;
 
 class SimulationWorker;
@@ -56,6 +57,14 @@ private:
     void clear_trend_();
     void update_plot_tools_();
 
+    void export_trajectory_();
+    void export_trajectory_csv_(const QString& file_name);
+
+    void export_plot_image_(
+        const QString& file_name,
+        const QString& format
+    );
+
     void update_elapsed_time_();
     void set_running_state_(bool is_running);
     void append_log_(const QString& message);
@@ -83,6 +92,7 @@ private:
 
     QPushButton* select_trend_button_{nullptr};
     QPushButton* clear_trend_button_{nullptr};
+    QPushButton* export_button_{nullptr};
 
     QProgressBar* progress_bar_{nullptr};
 

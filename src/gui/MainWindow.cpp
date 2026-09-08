@@ -4,9 +4,12 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QDialog>
+#include <QDir>
 #include <QEvent>
 #include <QFormLayout>
 #include <QFrame>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -15,10 +18,13 @@
 #include <QPlainTextEdit>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QPixmap>
 #include <QSpinBox>
 #include <QSizePolicy>
+#include <QSaveFile>
 #include <QThread>
 #include <QTimer>
+#include <QTextStream>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -151,6 +157,16 @@ MainWindow::MainWindow(QWidget* parent)
         analysis_panel
     };
 
+    export_button_ = new QPushButton{
+        "Export...",
+        analysis_panel
+    };
+
+    export_button_->setToolTip(
+        "Export trajectory data as CSV or save "
+        "the graph as PNG or JPG."
+    );
+
     clear_trend_button_->setToolTip(
         "Remove the selected trend or cancel point selection."
     );
@@ -172,6 +188,12 @@ MainWindow::MainWindow(QWidget* parent)
 
     analysis_layout->addWidget(
         clear_trend_button_
+    );
+
+    analysis_layout->addSpacing(8);
+
+    analysis_layout->addWidget(
+        export_button_
     );
 
     analysis_layout->addSpacing(8);
@@ -206,6 +228,15 @@ connect(
     this,
     [this] {
         clear_trend_();
+    }
+);
+
+    connect(
+    export_button_,
+    &QPushButton::clicked,
+    this,
+    [this] {
+        export_trajectory_();
     }
 );
 
@@ -1145,11 +1176,228 @@ void MainWindow::clear_trend_() {
     trajectory_plot_->clear_trend();
 }
 
+void MainWindow::export_trajectory_() {
+    if (
+        !trajectory_plot_ ||
+        trajectory_plot_->point_count() == 0
+    ) {
+        return;
+    }
+
+    const QString csv_filter =
+        "CSV data (*.csv)";
+
+    const QString png_filter =
+        "PNG image (*.png)";
+
+    const QString jpg_filter =
+        "JPEG image (*.jpg *.jpeg)";
+
+    QString selected_filter = csv_filter;
+
+    QString file_name = QFileDialog::getSaveFileName(
+        trajectory_dialog_,
+        "Export trajectory",
+        QDir::homePath() +
+            "/mean_position_trajectory.csv",
+        csv_filter +
+            ";;" +
+            png_filter +
+            ";;" +
+            jpg_filter,
+        &selected_filter
+    );
+
+    if (file_name.isEmpty()) {
+        return;
+    }
+
+    if (selected_filter == csv_filter) {
+        if (!file_name.endsWith(
+                ".csv",
+                Qt::CaseInsensitive
+            )) {
+            file_name += ".csv";
+            }
+
+        export_trajectory_csv_(file_name);
+        return;
+    }
+
+    if (selected_filter == png_filter) {
+        if (!file_name.endsWith(
+                ".png",
+                Qt::CaseInsensitive
+            )) {
+            file_name += ".png";
+            }
+
+        export_plot_image_(
+            file_name,
+            "PNG"
+        );
+
+        return;
+    }
+
+    if (
+        !file_name.endsWith(
+            ".jpg",
+            Qt::CaseInsensitive
+        ) &&
+        !file_name.endsWith(
+            ".jpeg",
+            Qt::CaseInsensitive
+        )
+    ) {
+        file_name += ".jpg";
+    }
+
+    export_plot_image_(
+        file_name,
+        "JPG"
+    );
+}
+
+void MainWindow::export_trajectory_csv_(
+    const QString& file_name
+) {
+    QSaveFile file{file_name};
+
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(
+            trajectory_dialog_,
+            "Export CSV",
+            QString{
+                "Cannot write file:\n%1"
+            }.arg(file.errorString())
+        );
+
+        return;
+    }
+
+    QTextStream stream{&file};
+
+    stream.setEncoding(
+        QStringConverter::Utf8
+    );
+
+    stream.setRealNumberNotation(
+        QTextStream::ScientificNotation
+    );
+
+    stream.setRealNumberPrecision(12);
+
+    stream << "\xEF\xBB\xBF";
+
+    const std::vector<QPointF> points =
+        trajectory_plot_->points();
+
+    const TrajectoryPlotWidget::LinearTrend trend =
+        trajectory_plot_->trend();
+
+    stream << "time;mean_x;trend_x;is_trend_region\n";
+
+    for (
+        std::size_t index = 0;
+        index < points.size();
+        ++index
+    ) {
+        const QPointF& point = points[index];
+
+        stream << point.x() << ';'
+               << point.y() << ';';
+
+        if (
+            trend.valid &&
+            index >= trend.start_index
+        ) {
+            const double trend_x =
+                trend.intercept +
+                trend.slope * point.x();
+
+            stream << trend_x << ";1\n";
+        } else {
+            stream << ";0\n";
+        }
+    }
+
+    if (!file.commit()) {
+        QMessageBox::warning(
+            trajectory_dialog_,
+            "Export CSV",
+            QString{
+                "Cannot save file:\n%1"
+            }.arg(file.errorString())
+        );
+
+        return;
+    }
+
+    QMessageBox::information(
+        trajectory_dialog_,
+        "Export CSV",
+        QString{
+            "Trajectory exported to:\n%1"
+        }.arg(
+            QDir::toNativeSeparators(
+                file_name
+            )
+        )
+    );
+}
+
+void MainWindow::export_plot_image_(
+    const QString& file_name,
+    const QString& format
+) {
+    const QPixmap plot_image =
+        trajectory_plot_->grab();
+
+    const int quality =
+        format == "JPG"
+            ? 95
+            : -1;
+
+    if (!plot_image.save(
+            file_name,
+            format.toUtf8().constData(),
+            quality
+        )) {
+        QMessageBox::warning(
+            trajectory_dialog_,
+            QString{"Export %1"}.arg(format),
+            QString{
+                "Cannot save image:\n%1"
+            }.arg(
+                QDir::toNativeSeparators(
+                    file_name
+                )
+            )
+        );
+
+        return;
+        }
+
+    QMessageBox::information(
+        trajectory_dialog_,
+        QString{"Export %1"}.arg(format),
+        QString{
+            "Graph exported to:\n%1"
+        }.arg(
+            QDir::toNativeSeparators(
+                file_name
+            )
+        )
+    );
+}
+
 void MainWindow::update_plot_tools_() {
     if (
         !trajectory_plot_ ||
         !select_trend_button_ ||
-        !clear_trend_button_
+        !clear_trend_button_ ||
+        !export_button_
     ) {
         return;
     }
@@ -1157,6 +1405,10 @@ void MainWindow::update_plot_tools_() {
     const bool trend_is_available =
         simulation_completed_ &&
         trajectory_plot_->point_count() >= 3;
+
+    const bool export_is_available =
+    simulation_completed_ &&
+    trajectory_plot_->point_count() > 0;
 
     select_trend_button_->setEnabled(
         trend_is_available &&
@@ -1169,6 +1421,10 @@ void MainWindow::update_plot_tools_() {
             trajectory_plot_->has_trend() ||
             trajectory_plot_->is_selecting_trend_start()
         )
+    );
+
+    export_button_->setEnabled(
+        export_is_available
     );
 }
 

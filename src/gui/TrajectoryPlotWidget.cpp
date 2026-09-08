@@ -154,6 +154,11 @@ std::size_t TrajectoryPlotWidget::point_count() const {
     return points_.size();
 }
 
+std::vector<QPointF>
+TrajectoryPlotWidget::points() const {
+    return points_;
+}
+
 TrajectoryPlotWidget::LinearTrend
 TrajectoryPlotWidget::trend() const {
     return trend_;

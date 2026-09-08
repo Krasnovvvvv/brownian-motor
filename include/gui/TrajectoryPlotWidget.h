@@ -45,6 +45,8 @@ public:
 
     [[nodiscard]] std::size_t point_count() const;
 
+    [[nodiscard]] std::vector<QPointF> points() const;
+
     [[nodiscard]] LinearTrend trend() const;
 
 signals:
