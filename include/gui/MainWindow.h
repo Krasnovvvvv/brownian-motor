@@ -55,6 +55,8 @@ private:
 
     void begin_trend_selection_();
     void clear_trend_();
+    void validate_burn_in_();
+    void clear_burn_in_validation_();
     void update_plot_tools_();
 
     void export_trajectory_();
@@ -93,6 +95,8 @@ private:
     QPushButton* select_trend_button_{nullptr};
     QPushButton* clear_trend_button_{nullptr};
     QPushButton* export_button_{nullptr};
+    QPushButton* validate_burn_in_button_{nullptr};
+    QPushButton* clear_burn_in_button_{nullptr};
 
     QProgressBar* progress_bar_{nullptr};
 
@@ -106,6 +110,8 @@ private:
     QLabel* workers_value_label_{nullptr};
 
     QLabel* trend_info_label_{nullptr};
+    QLabel* burn_in_info_label_{nullptr};
+    QSpinBox* burn_in_tolerance_spin_{nullptr};
 
     QPlainTextEdit* log_output_{nullptr};
 
@@ -118,6 +124,7 @@ private:
     std::shared_ptr<std::stop_source> cancellation_source_;
 
     bool simulation_completed_{false};
+    double trajectory_dt_{0.0};
 
     QTimer elapsed_timer_;
     QElapsedTimer elapsed_clock_;

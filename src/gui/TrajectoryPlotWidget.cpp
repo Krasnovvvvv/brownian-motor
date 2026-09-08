@@ -1,4 +1,5 @@
 #include "gui/TrajectoryPlotWidget.h"
+#include "core/BurnInValidator.h"
 
 #include <QEvent>
 #include <QFontMetrics>
@@ -67,11 +68,13 @@ void TrajectoryPlotWidget::clear_points() {
     hovered_index_.reset();
     selecting_trend_start_ = false;
     trend_ = {};
+    burn_in_validation_ = {};
 
     unsetCursor();
 
     emit point_count_changed(0);
     emit trend_cleared();
+    emit burn_in_validation_cleared();
 
     update();
 }
@@ -140,6 +143,103 @@ void TrajectoryPlotWidget::clear_trend() {
     emit trend_cleared();
 
     update();
+}
+
+void TrajectoryPlotWidget::validate_burn_in(
+    double dt, double velocity_tolerance
+) {
+    constexpr std::size_t minimum_points = 40;
+
+    if (points_.size() < minimum_points) {
+        emit burn_in_validation_failed(
+            "At least 40 trajectory points are required "
+            "for burn-in validation."
+        );
+
+        return;
+    }
+
+    std::vector<BurnInSample> samples;
+    samples.reserve(points_.size());
+
+    for (const QPointF& point : points_) {
+        samples.push_back(
+            BurnInSample{
+                .time = point.x(),
+                .mean_x = point.y()
+            }
+        );
+    }
+
+    const BurnInValidationResult result =
+    BurnInValidator::validate(
+        samples,
+        dt,
+        velocity_tolerance
+    );
+
+    if (!result.valid) {
+        emit burn_in_validation_failed(
+            "Burn-in validation cannot be calculated "
+            "from the current trajectory."
+        );
+
+        return;
+    }
+
+    burn_in_validation_ = BurnInValidation{
+        .valid = true,
+        .stable = result.stable,
+        .start_index = result.start_index,
+        .recommended_burn_in_steps =
+            result.recommended_burn_in_steps,
+        .start_time = result.start_time,
+        .early_velocity = result.early_velocity,
+        .late_velocity = result.late_velocity,
+        .tail_velocity = result.tail_velocity,
+        .relative_velocity_difference =
+            result.relative_velocity_difference,
+        .tail_r_squared = result.tail_r_squared,
+        .tolerance = result.tolerance
+    };
+
+    emit burn_in_validation_changed(
+    burn_in_validation_.stable,
+    burn_in_validation_.recommended_burn_in_steps,
+    burn_in_validation_.start_time,
+    burn_in_validation_.early_velocity,
+    burn_in_validation_.late_velocity,
+    burn_in_validation_.tail_velocity,
+    burn_in_validation_
+        .relative_velocity_difference,
+    burn_in_validation_.tail_r_squared,
+    burn_in_validation_.tolerance
+    );
+
+    update();
+}
+
+void TrajectoryPlotWidget::clear_burn_in_validation() {
+    if (!burn_in_validation_.valid) {
+        return;
+    }
+
+    burn_in_validation_ = {};
+
+    emit burn_in_validation_cleared();
+
+    update();
+}
+
+bool TrajectoryPlotWidget::has_burn_in_validation() const {
+    return
+        burn_in_validation_.valid &&
+        burn_in_validation_.stable;
+}
+
+TrajectoryPlotWidget::BurnInValidation
+TrajectoryPlotWidget::burn_in_validation() const {
+    return burn_in_validation_;
 }
 
 bool TrajectoryPlotWidget::has_trend() const {
@@ -480,6 +580,56 @@ void TrajectoryPlotWidget::paintEvent(
 
     const QColor grid_color =
         palette().color(QPalette::Midlight);
+
+    if (
+    burn_in_validation_.valid &&
+    burn_in_validation_.stable
+) {
+        const QPointF burn_in_screen_point =
+            map_to_plot_(
+                QPointF{
+                    burn_in_validation_.start_time,
+                    bounds.minimum_x
+                },
+                bounds
+            );
+
+        const QRectF transient_rect{
+            plot_rect.left(),
+            plot_rect.top(),
+            std::clamp(
+                burn_in_screen_point.x() -
+                    plot_rect.left(),
+                0.0,
+                plot_rect.width()
+            ),
+            plot_rect.height()
+        };
+
+        painter.fillRect(
+            transient_rect,
+            QColor{30, 41, 59, 70}
+        );
+
+        painter.setPen(
+            QPen{
+                QColor{"#A78BFA"},
+                1.5,
+                Qt::SolidLine
+            }
+        );
+
+        painter.drawLine(
+            QPointF{
+                burn_in_screen_point.x(),
+                plot_rect.top()
+            },
+            QPointF{
+                burn_in_screen_point.x(),
+                plot_rect.bottom()
+            }
+        );
+}
 
     painter.setPen(QPen{grid_color, 1.0});
     painter.drawRect(plot_rect);

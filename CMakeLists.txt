@@ -16,6 +16,9 @@ find_package(Matplot++ CONFIG REQUIRED)
 add_executable(brownian-motor
         main.cpp
 
+        include/core/BurnInValidator.h
+        src/core/BurnInValidator.cpp
+
         include/gui/MainWindow.h
         src/gui/MainWindow.cpp
 

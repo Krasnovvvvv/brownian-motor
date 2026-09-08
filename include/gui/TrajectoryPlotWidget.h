@@ -10,6 +10,8 @@
 #include <optional>
 #include <vector>
 
+#include "core/BurnInValidator.h"
+
 class QEvent;
 class QMouseEvent;
 class QPaintEvent;
@@ -29,6 +31,25 @@ public:
         double r_squared{0.0};
     };
 
+    struct BurnInValidation {
+        bool valid{false};
+        bool stable{false};
+
+        std::size_t start_index{0};
+        std::size_t recommended_burn_in_steps{0};
+
+        double start_time{0.0};
+
+        double early_velocity{0.0};
+        double late_velocity{0.0};
+        double tail_velocity{0.0};
+
+        double relative_velocity_difference{0.0};
+        double tail_r_squared{0.0};
+
+        double tolerance{0.25};
+    };
+
     explicit TrajectoryPlotWidget(
         QWidget* parent = nullptr
     );
@@ -38,6 +59,11 @@ public:
 
     void begin_trend_selection();
     void clear_trend();
+    void validate_burn_in(
+    double dt,
+    double velocity_tolerance
+    );
+    void clear_burn_in_validation();
 
     [[nodiscard]] bool has_trend() const;
 
@@ -48,6 +74,11 @@ public:
     [[nodiscard]] std::vector<QPointF> points() const;
 
     [[nodiscard]] LinearTrend trend() const;
+
+    [[nodiscard]] bool has_burn_in_validation() const;
+
+    [[nodiscard]] BurnInValidation
+    burn_in_validation() const;
 
 signals:
     void point_count_changed(
@@ -66,6 +97,24 @@ signals:
     void trend_cleared();
 
     void trend_selection_failed(
+        const QString& message
+    );
+
+    void burn_in_validation_changed(
+    bool stable,
+    std::size_t recommended_burn_in_steps,
+    double start_time,
+    double early_velocity,
+    double late_velocity,
+    double tail_velocity,
+    double relative_velocity_difference,
+    double tail_r_squared,
+    double tolerance
+    );
+
+    void burn_in_validation_cleared();
+
+    void burn_in_validation_failed(
         const QString& message
     );
 
@@ -114,6 +163,8 @@ private:
     bool selecting_trend_start_{false};
 
     LinearTrend trend_;
+
+    BurnInValidation burn_in_validation_;
 };
 
 #endif // BROWNIAN_MOTOR_TRAJECTORYPLOTWIDGET_H

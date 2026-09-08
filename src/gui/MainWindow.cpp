@@ -96,21 +96,21 @@ MainWindow::MainWindow(QWidget* parent)
     trajectory_dialog_ = new QDialog{nullptr};
 
     trajectory_dialog_->setWindowFlags(
-    Qt::Window |
-    Qt::WindowTitleHint |
-    Qt::WindowSystemMenuHint |
-    Qt::WindowMinimizeButtonHint |
-    Qt::WindowMaximizeButtonHint |
-    Qt::WindowCloseButtonHint
-);
+        Qt::Window |
+        Qt::WindowTitleHint |
+        Qt::WindowSystemMenuHint |
+        Qt::WindowMinimizeButtonHint |
+        Qt::WindowMaximizeButtonHint |
+        Qt::WindowCloseButtonHint
+    );
 
     trajectory_dialog_->setWindowTitle(
         "Mean position trajectory"
     );
 
     trajectory_dialog_->setModal(false);
-
     trajectory_dialog_->resize(900, 540);
+
     trajectory_dialog_->installEventFilter(this);
 
     auto* trajectory_layout =
@@ -129,80 +129,215 @@ MainWindow::MainWindow(QWidget* parent)
         trajectory_dialog_
     };
 
-    auto* analysis_panel = new QGroupBox{
-        "Trend analysis",
-        trajectory_dialog_
-    };
+auto* analysis_panel = new QWidget{
+    trajectory_dialog_
+};
 
-    analysis_panel->setFixedWidth(250);
+analysis_panel->setFixedWidth(250);
 
-    auto* analysis_layout = new QVBoxLayout{
-        analysis_panel
-    };
+auto* analysis_layout = new QVBoxLayout{
+    analysis_panel
+};
 
-    analysis_layout->setSpacing(8);
+analysis_layout->setContentsMargins(
+    0,
+    0,
+    0,
+    0
+);
 
-    select_trend_button_ = new QPushButton{
-        "Select trend start",
-        analysis_panel
-    };
+analysis_layout->setSpacing(10);
 
-    select_trend_button_->setToolTip(
-        "Choose the first point used for the linear "
-        "regression after the simulation has completed."
-    );
+auto* trend_group = new QGroupBox{
+    "Trend analysis",
+    analysis_panel
+};
 
-    clear_trend_button_ = new QPushButton{
-        "Clear trend",
-        analysis_panel
-    };
+trend_group->setAlignment(
+    Qt::AlignHCenter
+);
 
-    export_button_ = new QPushButton{
-        "Export...",
-        analysis_panel
-    };
+auto* trend_layout = new QVBoxLayout{
+    trend_group
+};
 
-    export_button_->setToolTip(
-        "Export trajectory data as CSV or save "
-        "the graph as PNG or JPG."
-    );
+trend_layout->setContentsMargins(
+    10,
+    12,
+    10,
+    10
+);
 
-    clear_trend_button_->setToolTip(
-        "Remove the selected trend or cancel point selection."
-    );
+trend_layout->setSpacing(8);
 
-    trend_info_label_ = new QLabel{
-        "Trend: available after simulation completes",
-        analysis_panel
-    };
+select_trend_button_ = new QPushButton{
+    "Select trend start",
+    trend_group
+};
 
-    trend_info_label_->setWordWrap(true);
-    trend_info_label_->setMinimumHeight(84);
-    trend_info_label_->setAlignment(
-        Qt::AlignLeft | Qt::AlignTop
-    );
+select_trend_button_->setToolTip(
+    "Choose the first point used for the linear "
+    "regression after the simulation has completed."
+);
 
-    analysis_layout->addWidget(
-        select_trend_button_
-    );
+clear_trend_button_ = new QPushButton{
+    "Clear trend",
+    trend_group
+};
 
-    analysis_layout->addWidget(
-        clear_trend_button_
-    );
+clear_trend_button_->setToolTip(
+    "Remove the selected trend or cancel "
+    "point selection."
+);
 
-    analysis_layout->addSpacing(8);
+trend_info_label_ = new QLabel{
+    "Trend: available after simulation completes",
+    trend_group
+};
 
-    analysis_layout->addWidget(
-        export_button_
-    );
+trend_info_label_->setWordWrap(true);
 
-    analysis_layout->addSpacing(8);
+trend_info_label_->setMinimumHeight(84);
 
-    analysis_layout->addWidget(
-        trend_info_label_
-    );
+trend_info_label_->setAlignment(
+    Qt::AlignLeft | Qt::AlignTop
+);
 
-    analysis_layout->addStretch(1);
+trend_layout->addWidget(
+    select_trend_button_
+);
+
+trend_layout->addWidget(
+    clear_trend_button_
+);
+
+trend_layout->addWidget(
+    trend_info_label_
+);
+
+auto* burn_in_group = new QGroupBox{
+    "Burn-in validation",
+    analysis_panel
+};
+
+burn_in_group->setAlignment(
+    Qt::AlignHCenter
+);
+
+auto* burn_in_layout = new QVBoxLayout{
+    burn_in_group
+};
+
+burn_in_layout->setContentsMargins(
+    10,
+    12,
+    10,
+    10
+);
+
+burn_in_layout->setSpacing(8);
+
+burn_in_tolerance_spin_ = make_spin_box(
+    5,
+    50,
+    25,
+    5
+);
+
+burn_in_tolerance_spin_->setSuffix("%");
+
+burn_in_tolerance_spin_->setToolTip(
+    "Maximum allowed relative difference "
+    "between early and late tail velocities."
+);
+
+auto* tolerance_form = new QFormLayout;
+
+tolerance_form->setContentsMargins(
+    0,
+    0,
+    0,
+    0
+);
+
+tolerance_form->addRow(
+    "Velocity tolerance:",
+    burn_in_tolerance_spin_
+);
+
+validate_burn_in_button_ = new QPushButton{
+    "Validate burn-in",
+    burn_in_group
+};
+
+validate_burn_in_button_->setToolTip(
+    "Find the earliest trajectory segment "
+    "whose early and late velocities agree "
+    "within the selected tolerance."
+);
+
+clear_burn_in_button_ = new QPushButton{
+    "Clear validation",
+    burn_in_group
+};
+
+clear_burn_in_button_->setToolTip(
+    "Remove the burn-in recommendation "
+    "and graph marker."
+);
+
+burn_in_info_label_ = new QLabel{
+    "Burn-in: not validated",
+    burn_in_group
+};
+
+burn_in_info_label_->setWordWrap(true);
+
+burn_in_info_label_->setMinimumHeight(152);
+
+burn_in_info_label_->setAlignment(
+    Qt::AlignLeft | Qt::AlignTop
+);
+
+burn_in_layout->addLayout(
+    tolerance_form
+);
+
+burn_in_layout->addWidget(
+    validate_burn_in_button_
+);
+
+burn_in_layout->addWidget(
+    clear_burn_in_button_
+);
+
+burn_in_layout->addWidget(
+    burn_in_info_label_
+);
+
+export_button_ = new QPushButton{
+    "Export...",
+    analysis_panel
+};
+
+export_button_->setToolTip(
+    "Export trajectory data as CSV or save "
+    "the graph as PNG or JPG."
+);
+
+analysis_layout->addWidget(
+    trend_group
+);
+
+analysis_layout->addWidget(
+    burn_in_group
+);
+
+analysis_layout->addWidget(
+    export_button_
+);
+
+analysis_layout->addStretch(1);
 
     trajectory_layout->addWidget(
         trajectory_plot_,
@@ -214,133 +349,254 @@ MainWindow::MainWindow(QWidget* parent)
     );
 
     connect(
-    select_trend_button_,
-    &QPushButton::clicked,
-    this,
-    [this] {
-        begin_trend_selection_();
-    }
-);
-
-connect(
-    clear_trend_button_,
-    &QPushButton::clicked,
-    this,
-    [this] {
-        clear_trend_();
-    }
-);
+        select_trend_button_,
+        &QPushButton::clicked,
+        this,
+        [this] {
+            begin_trend_selection_();
+        }
+    );
 
     connect(
-    export_button_,
-    &QPushButton::clicked,
-    this,
-    [this] {
-        export_trajectory_();
-    }
-);
-
-connect(
-    trajectory_plot_,
-    &TrajectoryPlotWidget::point_count_changed,
-    this,
-    [this](std::size_t) {
-        update_plot_tools_();
-    }
-);
-
-connect(
-    trajectory_plot_,
-    &TrajectoryPlotWidget::trend_selection_requested,
-    this,
-    [this] {
-        select_trend_button_->setText(
-            "Click a point on graph..."
-        );
-
-        trend_info_label_->setText(
-            "Trend: click the first point "
-            "of the regression range"
-        );
-
-        update_plot_tools_();
-    }
-);
-
-connect(
-    trajectory_plot_,
-    &TrajectoryPlotWidget::trend_changed,
-    this,
-    [this](
-        double start_time,
-        double intercept,
-        double slope,
-        double r_squared
-    ) {
-        Q_UNUSED(intercept);
-
-        select_trend_button_->setText(
-            "Select trend start"
-        );
-
-        trend_info_label_->setText(
-            QString{
-                "Trend fitted from:\n"
-                "t₀ = %1\n"
-                "v = %2\n"
-                "R² = %3"
-            }
-                .arg(start_time, 0, 'g', 6)
-                .arg(slope, 0, 'e', 4)
-                .arg(r_squared, 0, 'f', 4)
-        );
-
-        update_plot_tools_();
-    }
-);
-
-connect(
-    trajectory_plot_,
-    &TrajectoryPlotWidget::trend_cleared,
-    this,
-    [this] {
-        select_trend_button_->setText(
-            "Select trend start"
-        );
-
-        if (simulation_completed_) {
-            trend_info_label_->setText(
-                "Trend: not calculated"
-            );
-        } else {
-            trend_info_label_->setText(
-                "Trend: available after "
-                "simulation completes"
-            );
+        clear_trend_button_,
+        &QPushButton::clicked,
+        this,
+        [this] {
+            clear_trend_();
         }
+    );
 
-        update_plot_tools_();
-    }
-);
+    connect(
+        validate_burn_in_button_,
+        &QPushButton::clicked,
+        this,
+        [this] {
+            validate_burn_in_();
+        }
+    );
 
-connect(
-    trajectory_plot_,
-    &TrajectoryPlotWidget::trend_selection_failed,
-    this,
-    [this](const QString& message) {
-        select_trend_button_->setText(
-            "Select trend start"
-        );
+    connect(
+        clear_burn_in_button_,
+        &QPushButton::clicked,
+        this,
+        [this] {
+            clear_burn_in_validation_();
+        }
+    );
 
-        QMessageBox::information(
-            trajectory_dialog_,
-            "Trend selection",
-            message
-        );
+    connect(
+        export_button_,
+        &QPushButton::clicked,
+        this,
+        [this] {
+            export_trajectory_();
+        }
+    );
 
-        update_plot_tools_();
-    }
-);
+    connect(
+        trajectory_plot_,
+        &TrajectoryPlotWidget::point_count_changed,
+        this,
+        [this](std::size_t) {
+            update_plot_tools_();
+        }
+    );
+
+    connect(
+        trajectory_plot_,
+        &TrajectoryPlotWidget::trend_selection_requested,
+        this,
+        [this] {
+            select_trend_button_->setText(
+                "Click a point on graph..."
+            );
+
+            trend_info_label_->setText(
+                "Trend: click the first point "
+                "of the regression range"
+            );
+
+            update_plot_tools_();
+        }
+    );
+
+    connect(
+        trajectory_plot_,
+        &TrajectoryPlotWidget::trend_changed,
+        this,
+        [this](
+            double start_time,
+            double intercept,
+            double slope,
+            double r_squared
+        ) {
+            Q_UNUSED(intercept);
+
+            select_trend_button_->setText(
+                "Select trend start"
+            );
+
+            trend_info_label_->setText(
+                QString{
+                    "Trend fitted from:\n"
+                    "t₀ = %1\n"
+                    "v = %2\n"
+                    "R² = %3"
+                }
+                    .arg(start_time, 0, 'g', 6)
+                    .arg(slope, 0, 'e', 4)
+                    .arg(r_squared, 0, 'f', 4)
+            );
+
+            update_plot_tools_();
+        }
+    );
+
+    connect(
+        trajectory_plot_,
+        &TrajectoryPlotWidget::trend_cleared,
+        this,
+        [this] {
+            select_trend_button_->setText(
+                "Select trend start"
+            );
+
+            if (simulation_completed_) {
+                trend_info_label_->setText(
+                    "Trend: not calculated"
+                );
+            } else {
+                trend_info_label_->setText(
+                    "Trend: available after "
+                    "simulation completes"
+                );
+            }
+
+            update_plot_tools_();
+        }
+    );
+
+    connect(
+        trajectory_plot_,
+        &TrajectoryPlotWidget::trend_selection_failed,
+        this,
+        [this](const QString& message) {
+            select_trend_button_->setText(
+                "Select trend start"
+            );
+
+            QMessageBox::information(
+                trajectory_dialog_,
+                "Trend selection",
+                message
+            );
+
+            update_plot_tools_();
+        }
+    );
+
+    connect(
+        trajectory_plot_,
+        &TrajectoryPlotWidget::burn_in_validation_changed,
+        this,
+        [this](
+            bool stable,
+            std::size_t recommended_steps,
+            double start_time,
+            double early_velocity,
+            double late_velocity,
+            double tail_velocity,
+            double relative_difference,
+            double tail_r_squared,
+            double tolerance
+        ) {
+            if (!stable) {
+    const QString tolerance_text = QString{
+        "%1%"
+    }.arg(
+        100.0 * tolerance,
+        0,
+        'f',
+        1
+    );
+
+    burn_in_info_label_->setText(
+        QString{
+            "Burn-in: inconclusive\n"
+            "No stable tail found at %1 "
+            "velocity tolerance.\n"
+            "Increase tolerance, total time, "
+            "or particle count."
+        }.arg(tolerance_text)
+    );
+
+    update_plot_tools_();
+    return;
+}
+
+            burn_in_info_label_->setText(
+                QString{
+                    "Burn-in: stable\n"
+                    "Start: t = %1\n"
+                    "Steps: %2\n"
+                    "Early velocity: %3\n"
+                    "Late velocity: %4\n"
+                    "Tail velocity: %5\n"
+                    "Difference: %6\n"
+                    "Tail fit R²: %7"
+                }
+                    .arg(start_time, 0, 'g', 8)
+                    .arg(
+                        static_cast<qulonglong>(
+                            recommended_steps
+                        )
+                    )
+                    .arg(early_velocity, 0, 'e', 4)
+                    .arg(late_velocity, 0, 'e', 4)
+                    .arg(tail_velocity, 0, 'e', 4)
+                    .arg(
+                        QString{"%1%"}
+                            .arg(
+                                100.0 * relative_difference,
+                                0,
+                                'f',
+                                2
+                            )
+                    )
+                    .arg(tail_r_squared, 0, 'f', 4)
+            );
+
+            update_plot_tools_();
+        }
+    );
+
+    connect(
+        trajectory_plot_,
+        &TrajectoryPlotWidget::burn_in_validation_cleared,
+        this,
+        [this] {
+            burn_in_info_label_->setText(
+                "Burn-in: not validated"
+            );
+
+            update_plot_tools_();
+        }
+    );
+
+    connect(
+        trajectory_plot_,
+        &TrajectoryPlotWidget::burn_in_validation_failed,
+        this,
+        [this](const QString& message) {
+            QMessageBox::information(
+                trajectory_dialog_,
+                "Burn-in validation",
+                message
+            );
+
+            update_plot_tools_();
+        }
+    );
 
     update_show_graph_button_();
     update_plot_tools_();
@@ -357,6 +613,7 @@ connect(
     );
 
     setWindowTitle("Brownian Motor");
+
     resize(980, 680);
 
     append_log_(
@@ -778,9 +1035,13 @@ void MainWindow::start_simulation_() {
         std::make_shared<std::stop_source>();
 
     simulation_completed_ = false;
+    trajectory_dt_ = request.dt;
 
     if (request.interactive_mode) {
         trajectory_plot_->clear_points();
+        burn_in_info_label_->setText(
+        "Burn-in: available after simulation completes"
+        );
 
         trend_info_label_->setText(
             "Trend: available after simulation completes"
@@ -791,6 +1052,11 @@ void MainWindow::start_simulation_() {
         );
     } else {
         trajectory_plot_->clear_trend();
+        trajectory_plot_->clear_burn_in_validation();
+
+        burn_in_info_label_->setText(
+            "Burn-in: unavailable in Fast mode"
+        );
 
         trend_info_label_->setText(
             "Trend: unavailable in Fast mode"
@@ -1176,6 +1442,29 @@ void MainWindow::clear_trend_() {
     trajectory_plot_->clear_trend();
 }
 
+void MainWindow::validate_burn_in_() {
+    if (
+        !simulation_completed_ ||
+        !trajectory_plot_ ||
+        trajectory_dt_ <= 0.0
+    ) {
+        return;
+    }
+
+    trajectory_plot_->validate_burn_in(
+    trajectory_dt_,
+    burn_in_tolerance_spin_->value() / 100.0
+    );
+}
+
+void MainWindow::clear_burn_in_validation_() {
+    if (!trajectory_plot_) {
+        return;
+    }
+
+    trajectory_plot_->clear_burn_in_validation();
+}
+
 void MainWindow::export_trajectory_() {
     if (
         !trajectory_plot_ ||
@@ -1276,6 +1565,8 @@ void MainWindow::export_trajectory_csv_(
         return;
     }
 
+    file.write("\xEF\xBB\xBF", 3);
+
     QTextStream stream{&file};
 
     stream.setEncoding(
@@ -1287,8 +1578,6 @@ void MainWindow::export_trajectory_csv_(
     );
 
     stream.setRealNumberPrecision(12);
-
-    stream << "\xEF\xBB\xBF";
 
     const std::vector<QPointF> points =
         trajectory_plot_->points();
@@ -1397,6 +1686,9 @@ void MainWindow::update_plot_tools_() {
         !trajectory_plot_ ||
         !select_trend_button_ ||
         !clear_trend_button_ ||
+        !validate_burn_in_button_ ||
+        !burn_in_tolerance_spin_ ||
+        !clear_burn_in_button_ ||
         !export_button_
     ) {
         return;
@@ -1409,6 +1701,14 @@ void MainWindow::update_plot_tools_() {
     const bool export_is_available =
     simulation_completed_ &&
     trajectory_plot_->point_count() > 0;
+
+    const bool burn_in_validation_is_available =
+    simulation_completed_ &&
+    trajectory_plot_->point_count() >= 40;
+
+    burn_in_tolerance_spin_->setEnabled(
+    burn_in_validation_is_available
+    );
 
     select_trend_button_->setEnabled(
         trend_is_available &&
@@ -1425,6 +1725,14 @@ void MainWindow::update_plot_tools_() {
 
     export_button_->setEnabled(
         export_is_available
+    );
+
+    validate_burn_in_button_->setEnabled(
+    burn_in_validation_is_available
+    );
+
+    clear_burn_in_button_->setEnabled(
+        trajectory_plot_->has_burn_in_validation()
     );
 }
 
