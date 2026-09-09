@@ -3,11 +3,14 @@
 #pragma once
 
 #include <QElapsedTimer>
+#include <QJsonObject>
 #include <QMainWindow>
 #include <QTimer>
 
 #include <memory>
 #include <stop_token>
+
+#include "core/ExperimentLogger.h"
 
 class QComboBox;
 class QDoubleSpinBox;
@@ -39,6 +42,11 @@ protected:
 private:
     void create_interface_();
     void connect_controls_();
+
+    void log_experiment_event_(
+    const QString& event_name,
+    const QJsonObject& data = {}
+    );
 
     [[nodiscard]] SimulationRequest request_from_controls_() const;
 
@@ -128,6 +136,8 @@ private:
 
     QTimer elapsed_timer_;
     QElapsedTimer elapsed_clock_;
+
+    ExperimentLogger experiment_logger_;
 };
 
 #endif // BROWNIAN_MOTOR_MAINWINDOW_H

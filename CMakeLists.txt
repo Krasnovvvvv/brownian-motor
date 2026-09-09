@@ -29,6 +29,9 @@ add_executable(brownian-motor
 
         include/gui/TrajectoryPlotWidget.h
         src/gui/TrajectoryPlotWidget.cpp
+
+        include/core/ExperimentLogger.h
+        src/core/ExperimentLogger.cpp
 )
 
 target_include_directories(brownian-motor PRIVATE

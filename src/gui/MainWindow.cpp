@@ -13,6 +13,8 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QJsonObject>
+#include <QJsonValue>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPlainTextEdit>
@@ -430,7 +432,7 @@ analysis_layout->addStretch(1);
             double slope,
             double r_squared
         ) {
-            Q_UNUSED(intercept);
+            //Q_UNUSED(intercept);
 
             select_trend_button_->setText(
                 "Select trend start"
@@ -448,6 +450,33 @@ analysis_layout->addStretch(1);
                     .arg(r_squared, 0, 'f', 4)
             );
 
+            log_experiment_event_(
+    "trend_fitted",
+    QJsonObject{
+        {
+            "start_time",
+            start_time
+        },
+        {
+            "intercept",
+            intercept
+        },
+        {
+            "slope",
+            slope
+        },
+        {
+            "r_squared",
+            r_squared
+        },
+        {
+            "trajectory_points",
+            static_cast<qint64>(
+                trajectory_plot_->point_count()
+            )
+        }
+    }
+);
             update_plot_tools_();
         }
     );
@@ -510,6 +539,60 @@ analysis_layout->addStretch(1);
             double tail_r_squared,
             double tolerance
         ) {
+
+            log_experiment_event_(
+    stable
+        ? "burn_in_validated"
+        : "burn_in_inconclusive",
+    QJsonObject{
+        {
+            "stable",
+            stable
+        },
+        {
+            "tolerance_percent",
+            100.0 * tolerance
+        },
+
+        {
+            "trajectory_points",
+                static_cast<qint64>(
+                trajectory_plot_->point_count()
+                )
+          },
+
+        {
+            "recommended_burn_in_steps",
+            static_cast<qint64>(
+                recommended_steps
+            )
+        },
+        {
+            "start_time",
+            start_time
+        },
+        {
+            "early_velocity",
+            early_velocity
+        },
+        {
+            "late_velocity",
+            late_velocity
+        },
+        {
+            "tail_velocity",
+            tail_velocity
+        },
+        {
+            "velocity_difference_percent",
+            100.0 * relative_difference
+        },
+        {
+            "tail_r_squared",
+            tail_r_squared
+        }
+    }
+);
             if (!stable) {
     const QString tolerance_text = QString{
         "%1%"
@@ -619,6 +702,24 @@ analysis_layout->addStretch(1);
     append_log_(
         "Ready. Fast mode is optimized for final calculations. "
         "Interactive mode provides real progress and live observables."
+    );
+
+    log_experiment_event_(
+    "application_started",
+    QJsonObject{
+        {
+            "log_file",
+            experiment_logger_.log_file_path()
+        }
+    }
+    );
+
+    append_log_(
+        QString{
+            "Experiment log: %1"
+        }.arg(
+            experiment_logger_.log_file_path()
+        )
     );
 }
 
@@ -1051,8 +1152,7 @@ void MainWindow::start_simulation_() {
             "Select trend start"
         );
     } else {
-        trajectory_plot_->clear_trend();
-        trajectory_plot_->clear_burn_in_validation();
+        trajectory_plot_->clear_points();
 
         burn_in_info_label_->setText(
             "Burn-in: unavailable in Fast mode"
@@ -1221,6 +1321,72 @@ void MainWindow::start_simulation_() {
                     .arg(throughput, 0, 'f', 3)
             );
 
+            log_experiment_event_(
+    was_cancelled
+        ? "simulation_cancelled"
+        : "simulation_completed",
+    QJsonObject{
+        {
+            "mode",
+            request.interactive_mode
+                ? "interactive"
+                : "fast"
+        },
+        {
+            "status",
+            was_cancelled
+                ? "cancelled_partial_result"
+                : "completed"
+        },
+        {
+            "mean_velocity",
+            mean_velocity
+        },
+        {
+            "mean_x_final",
+            mean_x_final
+        },
+        {
+            "elapsed_seconds",
+            elapsed_seconds
+        },
+        {
+            "throughput_million_updates_per_second",
+            throughput
+        },
+        {
+            "workers_used",
+            static_cast<qint64>(workers)
+        },
+        {
+            "particles",
+            static_cast<qint64>(request.n_particles)
+        },
+        {
+            "dt",
+            request.dt
+        },
+        {
+            "total_time_requested",
+            request.total_time
+        },
+        {
+            "burn_in_steps",
+            static_cast<qint64>(
+                request.burn_in_steps
+            )
+        },
+        {
+            "trajectory_points",
+            request.interactive_mode
+                ? static_cast<qint64>(
+                    trajectory_plot_->point_count()
+                )
+                : QJsonValue{0}
+        }
+    }
+);
+
             if (request.interactive_mode) {
                 trend_info_label_->setText(
                     was_cancelled
@@ -1244,7 +1410,7 @@ void MainWindow::start_simulation_() {
         simulation_worker_,
         &SimulationWorker::failed,
         this,
-        [this](const QString& message) {
+        [this, request](const QString& message) {
             elapsed_timer_.stop();
 
             progress_bar_->setRange(0, 100);
@@ -1258,6 +1424,44 @@ void MainWindow::start_simulation_() {
                 QString{"Simulation failed: %1"}
                     .arg(message)
             );
+
+            log_experiment_event_(
+    "simulation_failed",
+    QJsonObject{
+        {
+            "mode",
+            request.interactive_mode
+                ? "interactive"
+                : "fast"
+        },
+        {
+            "error",
+            message
+        },
+        {
+            "particles",
+            static_cast<qint64>(request.n_particles)
+        },
+        {
+            "dt",
+            request.dt
+        },
+        {
+            "total_time",
+            request.total_time
+        },
+        {
+            "burn_in_steps",
+            static_cast<qint64>(
+                request.burn_in_steps
+            )
+        },
+        {
+            "seed",
+            static_cast<qint64>(request.seed)
+        }
+    }
+);
 
             simulation_completed_ = false;
 
@@ -1371,6 +1575,84 @@ void MainWindow::start_simulation_() {
             )
     );
 
+    log_experiment_event_(
+    "simulation_started",
+    QJsonObject{
+        {
+            "mode",
+            request.interactive_mode
+                ? "interactive"
+                : "fast"
+        },
+        {
+            "v1",
+            request.v1
+        },
+        {
+            "v2",
+            request.v2
+        },
+        {
+            "modulation_amplitude",
+            request.modulation_amplitude
+        },
+        {
+            "epsilon",
+            request.epsilon
+        },
+        {
+            "alpha",
+            request.alpha
+        },
+        {
+            "dt",
+            request.dt
+        },
+        {
+            "total_time",
+            request.total_time
+        },
+        {
+            "total_steps",
+            static_cast<qint64>(total_steps)
+        },
+        {
+            "particles",
+            static_cast<qint64>(request.n_particles)
+        },
+        {
+            "burn_in_steps",
+            static_cast<qint64>(
+                request.burn_in_steps
+            )
+        },
+        {
+            "seed",
+            static_cast<qint64>(request.seed)
+        },
+        {
+            "requested_workers",
+            request.requested_workers == 0
+                ? QJsonValue{"auto"}
+                : QJsonValue{
+                    static_cast<qint64>(
+                        request.requested_workers
+                    )
+                }
+        },
+        {
+            "batch_steps",
+            static_cast<qint64>(request.batch_steps)
+        },
+        {
+            "cancellation_check_steps",
+            static_cast<qint64>(
+                request.cancellation_check_steps
+            )
+        }
+    }
+);
+
     set_running_state_(true);
 
     if (request.interactive_mode) {
@@ -1409,6 +1691,26 @@ void MainWindow::cancel_simulation_() {
         "Cancellation requested. "
         "The solver stops at its next cancellation check."
     );
+
+    log_experiment_event_(
+    "cancellation_requested",
+    QJsonObject{
+        {
+            "mode",
+            mode_combo_->currentData().toBool()
+                ? "interactive"
+                : "fast"
+        },
+        {
+            "elapsed_seconds",
+            elapsed_clock_.isValid()
+                ? static_cast<double>(
+                    elapsed_clock_.elapsed()
+                ) / 1000.0
+                : 0.0
+        }
+    }
+);
 }
 
 void MainWindow::show_trajectory_window_() {
@@ -1634,6 +1936,34 @@ void MainWindow::export_trajectory_csv_(
             )
         )
     );
+
+    log_experiment_event_(
+    "trajectory_exported",
+    QJsonObject{
+        {
+            "format",
+            "csv"
+        },
+        {
+            "file_path",
+            QFileInfo{file_name}.absoluteFilePath()
+        },
+        {
+            "trajectory_points",
+            static_cast<qint64>(
+                trajectory_plot_->point_count()
+            )
+        },
+        {
+            "has_trend",
+            trajectory_plot_->has_trend()
+        },
+        {
+            "has_burn_in_validation",
+            trajectory_plot_->has_burn_in_validation()
+        }
+    }
+);
 }
 
 void MainWindow::export_plot_image_(
@@ -1679,6 +2009,35 @@ void MainWindow::export_plot_image_(
             )
         )
     );
+
+    log_experiment_event_(
+    "plot_exported",
+    QJsonObject{
+        {
+            "format",
+            format.toLower()
+        },
+        {
+            "file_path",
+            QFileInfo{file_name}.absoluteFilePath()
+        },
+        {
+            "trajectory_points",
+            static_cast<qint64>(
+                trajectory_plot_->point_count()
+            )
+        },
+        {
+            "has_trend",
+            trajectory_plot_->has_trend()
+        },
+        {
+            "has_burn_in_validation",
+            trajectory_plot_->has_burn_in_validation()
+        }
+    }
+);
+
 }
 
 void MainWindow::update_plot_tools_() {
@@ -1805,4 +2164,26 @@ void MainWindow::append_log_(
     const QString& message
 ) {
     log_output_->appendPlainText(message);
+}
+
+void MainWindow::log_experiment_event_(
+    const QString& event_name,
+    const QJsonObject& data
+) {
+    if (
+        experiment_logger_.write_event(
+            event_name,
+            data
+        )
+    ) {
+        return;
+    }
+
+    append_log_(
+        QString{
+            "Warning: unable to write experiment log: %1"
+        }.arg(
+            experiment_logger_.last_error()
+        )
+    );
 }
