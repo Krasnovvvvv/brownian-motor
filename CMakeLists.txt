@@ -10,6 +10,11 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
+set(
+    app_icon_resource_windows
+    "${CMAKE_CURRENT_SOURCE_DIR}/resources/brownian-motor.rc"
+)
+
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 find_package(Matplot++ CONFIG REQUIRED)
 
@@ -32,6 +37,9 @@ add_executable(brownian-motor
 
         include/core/ExperimentLogger.h
         src/core/ExperimentLogger.cpp
+
+        resources/icons.qrc
+        ${app_icon_resource_windows}
 )
 
 target_include_directories(brownian-motor PRIVATE
