@@ -1,4 +1,5 @@
 #include "gui/TrajectoryPlotWidget.h"
+
 #include "core/BurnInValidator.h"
 
 #include <QEvent>
@@ -67,6 +68,7 @@ void TrajectoryPlotWidget::clear_points() {
 
     hovered_index_.reset();
     selecting_trend_start_ = false;
+
     trend_ = {};
     burn_in_validation_ = {};
 
@@ -96,12 +98,29 @@ void TrajectoryPlotWidget::append_point(
     if (points_.size() > maximum_points) {
         points_.erase(points_.begin());
 
+        if (hovered_index_) {
+            if (*hovered_index_ > 0) {
+                --(*hovered_index_);
+            } else {
+                hovered_index_.reset();
+            }
+        }
+
         if (trend_.valid) {
             if (trend_.start_index > 0) {
                 --trend_.start_index;
             } else {
                 trend_ = {};
                 emit trend_cleared();
+            }
+        }
+
+        if (burn_in_validation_.valid) {
+            if (burn_in_validation_.start_index > 0) {
+                --burn_in_validation_.start_index;
+            } else {
+                burn_in_validation_ = {};
+                emit burn_in_validation_cleared();
             }
         }
     }
@@ -146,7 +165,8 @@ void TrajectoryPlotWidget::clear_trend() {
 }
 
 void TrajectoryPlotWidget::validate_burn_in(
-    double dt, double velocity_tolerance
+    double dt,
+    double velocity_tolerance
 ) {
     constexpr std::size_t minimum_points = 40;
 
@@ -172,11 +192,11 @@ void TrajectoryPlotWidget::validate_burn_in(
     }
 
     const BurnInValidationResult result =
-    BurnInValidator::validate(
-        samples,
-        dt,
-        velocity_tolerance
-    );
+        BurnInValidator::validate(
+            samples,
+            dt,
+            velocity_tolerance
+        );
 
     if (!result.valid) {
         emit burn_in_validation_failed(
@@ -204,16 +224,16 @@ void TrajectoryPlotWidget::validate_burn_in(
     };
 
     emit burn_in_validation_changed(
-    burn_in_validation_.stable,
-    burn_in_validation_.recommended_burn_in_steps,
-    burn_in_validation_.start_time,
-    burn_in_validation_.early_velocity,
-    burn_in_validation_.late_velocity,
-    burn_in_validation_.tail_velocity,
-    burn_in_validation_
-        .relative_velocity_difference,
-    burn_in_validation_.tail_r_squared,
-    burn_in_validation_.tolerance
+        burn_in_validation_.stable,
+        burn_in_validation_.recommended_burn_in_steps,
+        burn_in_validation_.start_time,
+        burn_in_validation_.early_velocity,
+        burn_in_validation_.late_velocity,
+        burn_in_validation_.tail_velocity,
+        burn_in_validation_
+            .relative_velocity_difference,
+        burn_in_validation_.tail_r_squared,
+        burn_in_validation_.tolerance
     );
 
     update();
@@ -392,6 +412,7 @@ TrajectoryPlotWidget::nearest_point_index_(
     }
 
     std::optional<std::size_t> nearest_index;
+
     double minimum_distance_squared =
         hover_distance_pixels *
         hover_distance_pixels;
@@ -567,6 +588,26 @@ void TrajectoryPlotWidget::paintEvent(
         true
     );
 
+    const QFont base_font = font();
+
+    QFont title_font = base_font;
+    title_font.setBold(true);
+
+    if (title_font.pointSize() > 0) {
+        title_font.setPointSize(
+            title_font.pointSize() + 1
+        );
+    }
+
+    QFont axis_font = base_font;
+    axis_font.setBold(true);
+
+    QFont tick_font = base_font;
+    tick_font.setWeight(QFont::DemiBold);
+
+    const QFontMetrics metrics{base_font};
+    const QFontMetrics tick_metrics{tick_font};
+
     painter.fillRect(
         rect(),
         palette().base()
@@ -581,60 +622,17 @@ void TrajectoryPlotWidget::paintEvent(
     const QColor grid_color =
         palette().color(QPalette::Midlight);
 
-    if (
-    burn_in_validation_.valid &&
-    burn_in_validation_.stable
-) {
-        const QPointF burn_in_screen_point =
-            map_to_plot_(
-                QPointF{
-                    burn_in_validation_.start_time,
-                    bounds.minimum_x
-                },
-                bounds
-            );
+    painter.setPen(
+        QPen{
+            grid_color,
+            1.0
+        }
+    );
 
-        const QRectF transient_rect{
-            plot_rect.left(),
-            plot_rect.top(),
-            std::clamp(
-                burn_in_screen_point.x() -
-                    plot_rect.left(),
-                0.0,
-                plot_rect.width()
-            ),
-            plot_rect.height()
-        };
-
-        painter.fillRect(
-            transient_rect,
-            QColor{30, 41, 59, 70}
-        );
-
-        painter.setPen(
-            QPen{
-                QColor{"#A78BFA"},
-                1.5,
-                Qt::SolidLine
-            }
-        );
-
-        painter.drawLine(
-            QPointF{
-                burn_in_screen_point.x(),
-                plot_rect.top()
-            },
-            QPointF{
-                burn_in_screen_point.x(),
-                plot_rect.bottom()
-            }
-        );
-}
-
-    painter.setPen(QPen{grid_color, 1.0});
     painter.drawRect(plot_rect);
 
     painter.setPen(text_color);
+    painter.setFont(title_font);
 
     painter.drawText(
         QRectF{
@@ -647,10 +645,14 @@ void TrajectoryPlotWidget::paintEvent(
         "Mean position trajectory"
     );
 
+    painter.setFont(base_font);
+
     if (points_.empty()) {
         painter.setPen(
             QColor{"#B8C7D9"}
         );
+
+        painter.setFont(title_font);
 
         painter.drawText(
             plot_rect,
@@ -659,6 +661,7 @@ void TrajectoryPlotWidget::paintEvent(
             "Select Interactive mode and run a simulation."
         );
 
+        painter.setFont(axis_font);
         painter.setPen(text_color);
 
         painter.drawText(
@@ -673,10 +676,12 @@ void TrajectoryPlotWidget::paintEvent(
         );
 
         painter.save();
+
         painter.translate(
             18.0,
             plot_rect.center().y()
         );
+
         painter.rotate(-90.0);
 
         painter.drawText(
@@ -701,7 +706,7 @@ void TrajectoryPlotWidget::paintEvent(
     const double x_range =
         bounds.maximum_x - bounds.minimum_x;
 
-    QFontMetrics metrics{font()};
+    painter.setFont(tick_font);
 
     for (int index = 0; index <= tick_count; ++index) {
         const double fraction =
@@ -720,16 +725,33 @@ void TrajectoryPlotWidget::paintEvent(
                 fraction * plot_rect.height()
             );
 
-        painter.setPen(QPen{grid_color, 1.0});
-
-        painter.drawLine(
-            QPointF{x_position, plot_rect.top()},
-            QPointF{x_position, plot_rect.bottom()}
+        painter.setPen(
+            QPen{
+                grid_color,
+                1.0
+            }
         );
 
         painter.drawLine(
-            QPointF{plot_rect.left(), y_position},
-            QPointF{plot_rect.right(), y_position}
+            QPointF{
+                x_position,
+                plot_rect.top()
+            },
+            QPointF{
+                x_position,
+                plot_rect.bottom()
+            }
+        );
+
+        painter.drawLine(
+            QPointF{
+                plot_rect.left(),
+                y_position
+            },
+            QPointF{
+                plot_rect.right(),
+                y_position
+            }
         );
 
         painter.setPen(text_color);
@@ -743,7 +765,9 @@ void TrajectoryPlotWidget::paintEvent(
             QPointF{
                 x_position -
                     static_cast<qreal>(
-                        metrics.horizontalAdvance(time_text)
+                        tick_metrics.horizontalAdvance(
+                            time_text
+                        )
                     ) / 2.0,
 
                 plot_rect.bottom() + 22.0
@@ -760,17 +784,22 @@ void TrajectoryPlotWidget::paintEvent(
             QPointF{
                 plot_rect.left() -
                     static_cast<qreal>(
-                        metrics.horizontalAdvance(x_text)
+                        tick_metrics.horizontalAdvance(
+                            x_text
+                        )
                     ) - 8.0,
 
                 y_position +
                     static_cast<qreal>(
-                        metrics.ascent()
+                        tick_metrics.ascent()
                     ) / 2.0
             },
             x_text
         );
     }
+
+    painter.setFont(axis_font);
+    painter.setPen(text_color);
 
     painter.drawText(
         QRectF{
@@ -805,10 +834,77 @@ void TrajectoryPlotWidget::paintEvent(
 
     painter.restore();
 
+    painter.setFont(base_font);
+
+    const bool show_burn_in =
+        burn_in_validation_.valid &&
+        burn_in_validation_.stable;
+
+    const bool show_trend =
+        trend_.valid;
+
+    if (show_burn_in) {
+        const QPointF burn_in_screen_point =
+            map_to_plot_(
+                QPointF{
+                    burn_in_validation_.start_time,
+                    bounds.minimum_x
+                },
+                bounds
+            );
+
+        const QRectF transient_rect{
+            plot_rect.left(),
+            plot_rect.top(),
+            std::clamp(
+                burn_in_screen_point.x() -
+                    plot_rect.left(),
+                0.0,
+                plot_rect.width()
+            ),
+            plot_rect.height()
+        };
+
+        painter.fillRect(
+            transient_rect,
+            QColor{30, 41, 59, 70}
+        );
+    }
+
+    if (show_trend) {
+        const QPointF trend_start_on_axis =
+            map_to_plot_(
+                QPointF{
+                    points_[trend_.start_index].x(),
+                    bounds.minimum_x
+                },
+                bounds
+            );
+
+        const QRectF trend_range_rect{
+            trend_start_on_axis.x(),
+            plot_rect.top(),
+            std::max(
+                0.0,
+                plot_rect.right() -
+                    trend_start_on_axis.x()
+            ),
+            plot_rect.height()
+        };
+
+        painter.fillRect(
+            trend_range_rect,
+            QColor{242, 177, 52, 18}
+        );
+    }
+
     QPainterPath trajectory_path;
 
     trajectory_path.moveTo(
-        map_to_plot_(points_.front(), bounds)
+        map_to_plot_(
+            points_.front(),
+            bounds
+        )
     );
 
     for (
@@ -817,7 +913,10 @@ void TrajectoryPlotWidget::paintEvent(
         ++index
     ) {
         trajectory_path.lineTo(
-            map_to_plot_(points_[index], bounds)
+            map_to_plot_(
+                points_[index],
+                bounds
+            )
         );
     }
 
@@ -832,9 +931,10 @@ void TrajectoryPlotWidget::paintEvent(
     );
 
     painter.setBrush(Qt::NoBrush);
+
     painter.drawPath(trajectory_path);
 
-    if (trend_.valid) {
+    if (show_trend) {
         const QPointF start_data_point =
             points_[trend_.start_index];
 
@@ -861,8 +961,195 @@ void TrajectoryPlotWidget::paintEvent(
         );
 
         painter.drawLine(
-            map_to_plot_(trend_start, bounds),
-            map_to_plot_(trend_end, bounds)
+            map_to_plot_(
+                trend_start,
+                bounds
+            ),
+            map_to_plot_(
+                trend_end,
+                bounds
+            )
+        );
+    }
+
+    if (show_burn_in) {
+        const QPointF burn_in_screen_point =
+            map_to_plot_(
+                QPointF{
+                    burn_in_validation_.start_time,
+                    bounds.minimum_x
+                },
+                bounds
+            );
+
+        painter.setPen(
+            QPen{
+                QColor{"#A78BFA"},
+                1.5,
+                Qt::SolidLine
+            }
+        );
+
+        painter.drawLine(
+            QPointF{
+                burn_in_screen_point.x(),
+                plot_rect.top()
+            },
+            QPointF{
+                burn_in_screen_point.x(),
+                plot_rect.bottom()
+            }
+        );
+
+        const QString burn_in_label = QString{
+            "Burn-in: t = %1"
+        }.arg(
+            format_value_(
+                burn_in_validation_.start_time
+            )
+        );
+
+        const qreal label_width =
+            static_cast<qreal>(
+                tick_metrics.horizontalAdvance(
+                    burn_in_label
+                )
+            );
+
+        qreal label_x =
+            burn_in_screen_point.x() + 6.0;
+
+        if (
+            label_x + label_width >
+            plot_rect.right() - 6.0
+        ) {
+            label_x =
+                burn_in_screen_point.x() -
+                label_width - 6.0;
+        }
+
+        label_x = std::max(
+            label_x,
+            plot_rect.left() + 6.0
+        );
+
+        painter.setFont(tick_font);
+        painter.setPen(
+            QColor{"#DDD6FE"}
+        );
+
+        painter.drawText(
+            QPointF{
+                label_x,
+                plot_rect.top() + 18.0
+            },
+            burn_in_label
+        );
+
+        painter.setFont(base_font);
+    }
+
+    const int legend_rows =
+        1 +
+        (show_trend ? 1 : 0) +
+        (show_burn_in ? 1 : 0);
+
+    const qreal legend_width = 154.0;
+    const qreal legend_row_height = 21.0;
+
+    const qreal legend_height =
+        12.0 +
+        legend_rows * legend_row_height;
+
+    const QRectF legend_rect{
+        plot_rect.right() - legend_width - 10.0,
+        plot_rect.top() + 10.0,
+        legend_width,
+        legend_height
+    };
+
+    painter.setPen(
+        QPen{
+            QColor{100, 116, 139, 190},
+            1.0
+        }
+    );
+
+    painter.setBrush(
+        QColor{15, 23, 42, 210}
+    );
+
+    painter.drawRoundedRect(
+        legend_rect,
+        5.0,
+        5.0
+    );
+
+    painter.setFont(base_font);
+
+    qreal legend_y =
+        legend_rect.top() + 16.0;
+
+    const auto draw_legend_entry =
+        [&painter, &legend_rect, &legend_y](
+            const QColor& color,
+            Qt::PenStyle style,
+            const QString& text
+        ) {
+            painter.setPen(
+                QPen{
+                    color,
+                    2.0,
+                    style,
+                    Qt::RoundCap
+                }
+            );
+
+            painter.drawLine(
+                QPointF{
+                    legend_rect.left() + 10.0,
+                    legend_y
+                },
+                QPointF{
+                    legend_rect.left() + 34.0,
+                    legend_y
+                }
+            );
+
+            painter.setPen(
+                QColor{"#E2E8F0"}
+            );
+
+            painter.drawText(
+                QPointF{
+                    legend_rect.left() + 43.0,
+                    legend_y + 5.0
+                },
+                text
+            );
+
+            legend_y += 21.0;
+        };
+
+    draw_legend_entry(
+        QColor{35, 120, 220},
+        Qt::SolidLine,
+        "Trajectory"
+    );
+
+    if (show_trend) {
+        draw_legend_entry(
+            QColor{"#F2B134"},
+            Qt::DashLine,
+            "Linear trend"
+        );
+    }
+
+    if (show_burn_in) {
+        draw_legend_entry(
+            QColor{"#A78BFA"},
+            Qt::SolidLine,
+            "Burn-in start"
         );
     }
 
@@ -871,7 +1158,10 @@ void TrajectoryPlotWidget::paintEvent(
             points_[*hovered_index_];
 
         const QPointF hovered_screen_point =
-            map_to_plot_(hovered_data_point, bounds);
+            map_to_plot_(
+                hovered_data_point,
+                bounds
+            );
 
         painter.setPen(
             QPen{
@@ -930,16 +1220,17 @@ void TrajectoryPlotWidget::paintEvent(
                 )
             );
 
-        const QRect tooltip_rect = metrics.boundingRect(
-            QRect{
-                0,
-                0,
-                220,
-                100
-            },
-            Qt::AlignLeft | Qt::TextWordWrap,
-            hover_text
-        ).adjusted(-8, -6, 8, 6);
+        const QRect tooltip_rect =
+            metrics.boundingRect(
+                QRect{
+                    0,
+                    0,
+                    220,
+                    100
+                },
+                Qt::AlignLeft | Qt::TextWordWrap,
+                hover_text
+            ).adjusted(-8, -6, 8, 6);
 
         qreal tooltip_x =
             hovered_screen_point.x() + 14.0;
@@ -972,8 +1263,12 @@ void TrajectoryPlotWidget::paintEvent(
         const QRectF tooltip_draw_rect{
             tooltip_x,
             tooltip_y,
-            static_cast<qreal>(tooltip_rect.width()),
-            static_cast<qreal>(tooltip_rect.height())
+            static_cast<qreal>(
+                tooltip_rect.width()
+            ),
+            static_cast<qreal>(
+                tooltip_rect.height()
+            )
         };
 
         painter.setPen(
@@ -1010,7 +1305,10 @@ void TrajectoryPlotWidget::paintEvent(
     }
 
     const QPointF last_point =
-        map_to_plot_(points_.back(), bounds);
+        map_to_plot_(
+            points_.back(),
+            bounds
+        );
 
     painter.setBrush(
         QColor{35, 120, 220}
@@ -1030,7 +1328,12 @@ void TrajectoryPlotWidget::paintEvent(
 
         const QRect instruction_rect =
             metrics.boundingRect(
-                QRect{0, 0, 320, 32},
+                QRect{
+                    0,
+                    0,
+                    320,
+                    32
+                },
                 Qt::AlignCenter,
                 instruction
             ).adjusted(-10, -6, 10, 6);
@@ -1141,6 +1444,7 @@ void TrajectoryPlotWidget::mousePressEvent(
 
     if (calculate_trend_(*selected_index)) {
         selecting_trend_start_ = false;
+
         unsetCursor();
 
         emit trend_changed(
@@ -1165,13 +1469,18 @@ QString TrajectoryPlotWidget::format_value_(
         value = 0.0;
     }
 
-    const double magnitude = std::abs(value);
+    const double magnitude =
+        std::abs(value);
 
     if (
         magnitude >= 10'000.0 ||
         (magnitude > 0.0 && magnitude < 0.001)
     ) {
-        return QString::number(value, 'e', 2);
+        return QString::number(
+            value,
+            'e',
+            2
+        );
     }
 
     int decimals = 0;
