@@ -59,6 +59,13 @@ public:
 
     void begin_trend_selection();
     void clear_trend();
+
+    void set_trend_range_highlight_visible(
+    bool visible
+    );
+
+    [[nodiscard]] bool is_trend_range_highlight_visible() const;
+
     void validate_burn_in(
     double dt,
     double velocity_tolerance
@@ -163,7 +170,7 @@ private:
     bool selecting_trend_start_{false};
 
     LinearTrend trend_;
-
+    bool trend_range_highlight_visible_{true};
     BurnInValidation burn_in_validation_;
 };
 

@@ -2,6 +2,7 @@
 
 #include <Qt>
 #include <QComboBox>
+#include <QCheckBox>
 #include <QDoubleSpinBox>
 #include <QDialog>
 #include <QDir>
@@ -187,6 +188,18 @@ clear_trend_button_ = new QPushButton{
     trend_group
 };
 
+    highlight_trend_range_check_ = new QCheckBox{
+        "Highlight trend range",
+        trend_group
+    };
+
+    highlight_trend_range_check_->setChecked(true);
+
+    highlight_trend_range_check_->setToolTip(
+        "Show a subtle yellow background over the "
+        "trajectory range used for the linear trend."
+    );
+
 clear_trend_button_->setToolTip(
     "Remove the selected trend or cancel "
     "point selection."
@@ -211,6 +224,10 @@ trend_layout->addWidget(
 
 trend_layout->addWidget(
     clear_trend_button_
+);
+
+    trend_layout->addWidget(
+    highlight_trend_range_check_
 );
 
 trend_layout->addWidget(
@@ -367,6 +384,21 @@ analysis_layout->addStretch(1);
             clear_trend_();
         }
     );
+
+    connect(
+    highlight_trend_range_check_,
+    &QCheckBox::toggled,
+    this,
+    [this](bool checked) {
+        if (!trajectory_plot_) {
+            return;
+        }
+
+        trajectory_plot_->set_trend_range_highlight_visible(
+            checked
+        );
+    }
+);
 
     connect(
         validate_burn_in_button_,
@@ -2045,6 +2077,7 @@ void MainWindow::update_plot_tools_() {
         !trajectory_plot_ ||
         !select_trend_button_ ||
         !clear_trend_button_ ||
+        !highlight_trend_range_check_ ||
         !validate_burn_in_button_ ||
         !burn_in_tolerance_spin_ ||
         !clear_burn_in_button_ ||
@@ -2080,6 +2113,10 @@ void MainWindow::update_plot_tools_() {
             trajectory_plot_->has_trend() ||
             trajectory_plot_->is_selecting_trend_start()
         )
+    );
+
+    highlight_trend_range_check_->setEnabled(
+    trajectory_plot_->has_trend()
     );
 
     export_button_->setEnabled(

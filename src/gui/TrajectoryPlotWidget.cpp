@@ -164,6 +164,22 @@ void TrajectoryPlotWidget::clear_trend() {
     update();
 }
 
+void TrajectoryPlotWidget::set_trend_range_highlight_visible(
+    bool visible
+) {
+    if (trend_range_highlight_visible_ == visible) {
+        return;
+    }
+
+    trend_range_highlight_visible_ = visible;
+
+    update();
+}
+
+bool TrajectoryPlotWidget::is_trend_range_highlight_visible() const {
+    return trend_range_highlight_visible_;
+}
+
 void TrajectoryPlotWidget::validate_burn_in(
     double dt,
     double velocity_tolerance
@@ -616,6 +632,13 @@ void TrajectoryPlotWidget::paintEvent(
     const PlotBounds bounds = plot_bounds_();
     const QRectF& plot_rect = bounds.rect;
 
+    const bool show_burn_in =
+        burn_in_validation_.valid &&
+        burn_in_validation_.stable;
+
+    const bool show_trend =
+        trend_.valid;
+
     const QColor text_color =
         palette().color(QPalette::Text);
 
@@ -706,6 +729,43 @@ void TrajectoryPlotWidget::paintEvent(
     const double x_range =
         bounds.maximum_x - bounds.minimum_x;
 
+    QString burn_in_tick_text;
+
+    qreal burn_in_tick_x = 0.0;
+
+    qreal burn_in_tick_left = 0.0;
+    qreal burn_in_tick_right = 0.0;
+
+    if (show_burn_in) {
+        burn_in_tick_text = format_value_(
+            burn_in_validation_.start_time
+        );
+
+        burn_in_tick_x =
+            map_to_plot_(
+                QPointF{
+                    burn_in_validation_.start_time,
+                    bounds.minimum_x
+                },
+                bounds
+            ).x();
+
+        const qreal burn_in_tick_width =
+            static_cast<qreal>(
+                tick_metrics.horizontalAdvance(
+                    burn_in_tick_text
+                )
+            );
+
+        burn_in_tick_left =
+            burn_in_tick_x -
+            burn_in_tick_width / 2.0;
+
+        burn_in_tick_right =
+            burn_in_tick_x +
+            burn_in_tick_width / 2.0;
+    }
+
     painter.setFont(tick_font);
 
     for (int index = 0; index <= tick_count; ++index) {
@@ -761,19 +821,33 @@ void TrajectoryPlotWidget::paintEvent(
             fraction * time_range
         );
 
-        painter.drawText(
-            QPointF{
-                x_position -
-                    static_cast<qreal>(
-                        tick_metrics.horizontalAdvance(
-                            time_text
-                        )
-                    ) / 2.0,
-
-                plot_rect.bottom() + 22.0
-            },
+        const qreal time_text_width =
+    static_cast<qreal>(
+        tick_metrics.horizontalAdvance(
             time_text
-        );
+        )
+    );
+
+        const qreal time_text_left =
+            x_position - time_text_width / 2.0;
+
+        const qreal time_text_right =
+            x_position + time_text_width / 2.0;
+
+        const bool overlaps_burn_in_label =
+            show_burn_in &&
+            time_text_right >= burn_in_tick_left - 4.0 &&
+            time_text_left <= burn_in_tick_right + 4.0;
+
+        if (!overlaps_burn_in_label) {
+            painter.drawText(
+                QPointF{
+                    time_text_left,
+                    plot_rect.bottom() + 22.0
+                },
+                time_text
+            );
+        }
 
         const QString x_text = format_value_(
             bounds.minimum_x +
@@ -795,6 +869,20 @@ void TrajectoryPlotWidget::paintEvent(
                     ) / 2.0
             },
             x_text
+        );
+    }
+
+    if (show_burn_in) {
+        painter.setPen(
+            QColor{"#C4B5FD"}
+        );
+
+        painter.drawText(
+            QPointF{
+                burn_in_tick_left,
+                plot_rect.bottom() + 22.0
+            },
+            burn_in_tick_text
         );
     }
 
@@ -835,14 +923,7 @@ void TrajectoryPlotWidget::paintEvent(
     painter.restore();
 
     painter.setFont(base_font);
-
-    const bool show_burn_in =
-        burn_in_validation_.valid &&
-        burn_in_validation_.stable;
-
-    const bool show_trend =
-        trend_.valid;
-
+    
     if (show_burn_in) {
         const QPointF burn_in_screen_point =
             map_to_plot_(
@@ -871,7 +952,8 @@ void TrajectoryPlotWidget::paintEvent(
         );
     }
 
-    if (show_trend) {
+    if (show_trend &&
+        trend_range_highlight_visible_) {
         const QPointF trend_start_on_axis =
             map_to_plot_(
                 QPointF{
@@ -999,51 +1081,6 @@ void TrajectoryPlotWidget::paintEvent(
                 burn_in_screen_point.x(),
                 plot_rect.bottom()
             }
-        );
-
-        const QString burn_in_label = QString{
-            "Burn-in: t = %1"
-        }.arg(
-            format_value_(
-                burn_in_validation_.start_time
-            )
-        );
-
-        const qreal label_width =
-            static_cast<qreal>(
-                tick_metrics.horizontalAdvance(
-                    burn_in_label
-                )
-            );
-
-        qreal label_x =
-            burn_in_screen_point.x() + 6.0;
-
-        if (
-            label_x + label_width >
-            plot_rect.right() - 6.0
-        ) {
-            label_x =
-                burn_in_screen_point.x() -
-                label_width - 6.0;
-        }
-
-        label_x = std::max(
-            label_x,
-            plot_rect.left() + 6.0
-        );
-
-        painter.setFont(tick_font);
-        painter.setPen(
-            QColor{"#DDD6FE"}
-        );
-
-        painter.drawText(
-            QPointF{
-                label_x,
-                plot_rect.top() + 18.0
-            },
-            burn_in_label
         );
 
         painter.setFont(base_font);

@@ -13,6 +13,7 @@
 #include "core/ExperimentLogger.h"
 
 class QComboBox;
+class QCheckBox;
 class QDoubleSpinBox;
 class QDialog;
 class QEvent;
@@ -102,6 +103,9 @@ private:
 
     QPushButton* select_trend_button_{nullptr};
     QPushButton* clear_trend_button_{nullptr};
+
+    QCheckBox* highlight_trend_range_check_{nullptr};
+
     QPushButton* export_button_{nullptr};
     QPushButton* validate_burn_in_button_{nullptr};
     QPushButton* clear_burn_in_button_{nullptr};
