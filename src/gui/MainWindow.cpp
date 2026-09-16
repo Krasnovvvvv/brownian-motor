@@ -89,6 +89,21 @@ namespace {
     return label;
 }
 
+    void configure_group_title(
+    QGroupBox* group
+) {
+    group->setAlignment(
+        Qt::AlignHCenter
+    );
+
+    group->setStyleSheet(
+        "QGroupBox {"
+        "    font-size: 11pt;"
+        "    font-weight: bold;"
+        "}"
+    );
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent)
@@ -780,6 +795,7 @@ void MainWindow::create_interface_() {
     root_layout->addLayout(parameters_layout);
 
     auto* potential_group = new QGroupBox{"Potential"};
+    configure_group_title(potential_group);
     auto* potential_form = new QFormLayout{potential_group};
 
     v1_spin_ = make_double_spin_box(
@@ -796,8 +812,8 @@ void MainWindow::create_interface_() {
     parameters_layout->addWidget(potential_group, 1);
 
     auto* modulation_group =
-        new QGroupBox{"Dichotomic modulation"};
-
+        new QGroupBox{"Modulation"};
+    configure_group_title(modulation_group);
     auto* modulation_form = new QFormLayout{
         modulation_group
     };
@@ -824,7 +840,7 @@ void MainWindow::create_interface_() {
     "Simulation",
     central_widget
 };
-
+    configure_group_title(simulation_group);
 auto* simulation_group_layout = new QVBoxLayout{
     simulation_group
 };
