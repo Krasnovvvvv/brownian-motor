@@ -1328,7 +1328,7 @@ void MainWindow::start_simulation_() {
     if (request.interactive_mode) {
         trajectory_plot_->clear_points();
         burn_in_info_label_->setText(
-        "Burn-in: available after simulation completes"
+        "Burn-in: available after simulation completes/upon accumulating 40 points"
         );
 
         trend_info_label_->setText(
