@@ -22,6 +22,7 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QPixmap>
+#include <QScrollArea>
 #include <QSpinBox>
 #include <QSizePolicy>
 #include <QSaveFile>
@@ -792,7 +793,7 @@ void MainWindow::create_interface_() {
     potential_form->addRow("V1:", v1_spin_);
     potential_form->addRow("V2:", v2_spin_);
 
-    parameters_layout->addWidget(potential_group);
+    parameters_layout->addWidget(potential_group, 1);
 
     auto* modulation_group =
         new QGroupBox{"Dichotomic modulation"};
@@ -817,83 +818,221 @@ void MainWindow::create_interface_() {
     modulation_form->addRow("epsilon:", epsilon_spin_);
     modulation_form->addRow("alpha:", alpha_spin_);
 
-    parameters_layout->addWidget(modulation_group);
+    parameters_layout->addWidget(modulation_group, 1);
 
-    auto* simulation_group = new QGroupBox{"Simulation"};
-    auto* simulation_form = new QFormLayout{
-        simulation_group
-    };
+    auto* simulation_group = new QGroupBox{
+    "Simulation",
+    central_widget
+};
 
-    dt_spin_ = make_double_spin_box(
-        1.0e-8, 1.0, 0.001, 10, 1.0e-4
+auto* simulation_group_layout = new QVBoxLayout{
+    simulation_group
+};
+
+simulation_group_layout->setContentsMargins(
+    8,
+    10,
+    8,
+    8
+);
+
+simulation_group_layout->setSpacing(0);
+
+auto* simulation_scroll_area = new QScrollArea{
+    simulation_group
+};
+
+simulation_scroll_area->setWidgetResizable(true);
+
+simulation_scroll_area->setFrameShape(
+    QFrame::NoFrame
+);
+
+simulation_scroll_area->setHorizontalScrollBarPolicy(
+    Qt::ScrollBarAlwaysOff
+);
+
+simulation_scroll_area->setVerticalScrollBarPolicy(
+    Qt::ScrollBarAsNeeded
+);
+
+auto* simulation_content = new QWidget{
+    simulation_scroll_area
+};
+
+auto* simulation_form = new QFormLayout{
+    simulation_content
+};
+
+simulation_form->setContentsMargins(
+    4,
+    2,
+    8,
+    2
+);
+
+simulation_form->setHorizontalSpacing(10);
+
+simulation_form->setVerticalSpacing(7);
+
+dt_spin_ = make_double_spin_box(
+    1.0e-8,
+    1.0,
+    0.001,
+    10,
+    1.0e-4
+);
+
+total_time_spin_ = make_double_spin_box(
+    1.0e-6,
+    1'000'000.0,
+    100.0,
+    6,
+    10.0
+);
+
+particles_spin_ = make_spin_box(
+    1,
+    10'000'000,
+    2'000,
+    1'000
+);
+
+burn_in_spin_ = make_spin_box(
+    0,
+    2'000'000'000,
+    10'000,
+    1'000
+);
+
+x0_spin_ = make_double_spin_box(
+    -1.0e6,
+    1.0e6,
+    0.0,
+    8,
+    0.01
+);
+
+x0_spin_->setToolTip(
+    "Initial coordinate x₀ used for every "
+    "particle of the ensemble at t = 0."
+);
+
+seed_spin_ = make_spin_box(
+    0,
+    2'147'483'647,
+    42
+);
+
+const std::size_t hardware_threads =
+    std::max(
+        std::size_t{1},
+        static_cast<std::size_t>(
+            std::thread::hardware_concurrency()
+        )
     );
 
-    total_time_spin_ = make_double_spin_box(
-        1.0e-6, 1'000'000.0, 100.0, 6, 10.0
+workers_spin_ = make_spin_box(
+    0,
+    static_cast<int>(hardware_threads),
+    0
+);
+
+workers_spin_->setSpecialValueText(
+    QString{
+        "Auto (%1)"
+    }.arg(
+        static_cast<qulonglong>(
+            hardware_threads
+        )
+    )
+);
+
+mode_combo_ = new QComboBox{
+    simulation_content
+};
+
+mode_combo_->addItem(
+    "Fast: final result only",
+    false
+);
+
+mode_combo_->addItem(
+    "Interactive: progress and live data",
+    true
+);
+
+mode_combo_->setToolTip(
+    "Fast mode avoids intermediate ensemble reductions. "
+    "Interactive mode calculates in batches and provides "
+    "real progress updates."
+);
+
+simulation_form->addRow(
+    "Mode",
+    mode_combo_
+);
+
+simulation_form->addRow(
+    "dt",
+    dt_spin_
+);
+
+simulation_form->addRow(
+    "Total time",
+    total_time_spin_
+);
+
+simulation_form->addRow(
+    "Particles",
+    particles_spin_
+);
+
+simulation_form->addRow(
+    "Burn-in steps",
+    burn_in_spin_
+);
+
+simulation_form->addRow(
+    "Initial position x₀",
+    x0_spin_
+);
+
+simulation_form->addRow(
+    "Seed",
+    seed_spin_
+);
+
+simulation_form->addRow(
+    "Workers",
+    workers_spin_
+);
+
+simulation_scroll_area->setWidget(
+    simulation_content
+);
+
+simulation_group_layout->addWidget(
+    simulation_scroll_area
+);
+
+parameters_layout->addWidget(
+    simulation_group, 1
+);
+
+    constexpr int parameter_group_height = 300;
+
+    potential_group->setFixedHeight(
+        parameter_group_height
     );
 
-    particles_spin_ = make_spin_box(
-        1, 10'000'000, 2'000, 1'000
+    modulation_group->setFixedHeight(
+        parameter_group_height
     );
 
-    burn_in_spin_ = make_spin_box(
-        0, 2'000'000'000, 10'000, 1'000
+    simulation_group->setFixedHeight(
+        parameter_group_height
     );
-
-    seed_spin_ = make_spin_box(
-        0, 2'147'483'647, 42
-    );
-
-    const std::size_t hardware_threads =
-        std::max(
-            std::size_t{1},
-            static_cast<std::size_t>(
-                std::thread::hardware_concurrency()
-            )
-        );
-
-    workers_spin_ = make_spin_box(
-        0,
-        static_cast<int>(hardware_threads),
-        0
-    );
-
-    workers_spin_->setSpecialValueText(
-        QString{"Auto (%1)"}
-            .arg(
-                static_cast<qulonglong>(
-                    hardware_threads
-                )
-            )
-    );
-
-    mode_combo_ = new QComboBox;
-
-    mode_combo_->addItem(
-        "Fast: final result only",
-        false
-    );
-
-    mode_combo_->addItem(
-        "Interactive: progress and live data",
-        true
-    );
-
-    mode_combo_->setToolTip(
-        "Fast mode avoids intermediate ensemble reductions.\n"
-        "Interactive mode calculates in batches and provides "
-        "real progress updates."
-    );
-
-    simulation_form->addRow("Mode:", mode_combo_);
-    simulation_form->addRow("dt:", dt_spin_);
-    simulation_form->addRow("Total time:", total_time_spin_);
-    simulation_form->addRow("Particles:", particles_spin_);
-    simulation_form->addRow("Burn-in steps:", burn_in_spin_);
-    simulation_form->addRow("Seed:", seed_spin_);
-    simulation_form->addRow("Workers:", workers_spin_);
-
-    parameters_layout->addWidget(simulation_group);
 
     auto* controls_layout = new QHBoxLayout;
 
@@ -1051,7 +1190,7 @@ SimulationRequest MainWindow::request_from_controls_() const {
             burn_in_spin_->value()
         ),
 
-        .x0 = 0.0,
+        .x0 = x0_spin_->value(),
 
         .seed = static_cast<std::uint32_t>(
             seed_spin_->value()
@@ -1645,6 +1784,10 @@ void MainWindow::start_simulation_() {
             request.total_time
         },
         {
+            "x0",
+            request.x0
+        },
+        {
             "total_steps",
             static_cast<qint64>(total_steps)
         },
@@ -2187,6 +2330,7 @@ void MainWindow::set_running_state_(bool is_running) {
 
     dt_spin_->setEnabled(!is_running);
     total_time_spin_->setEnabled(!is_running);
+    x0_spin_->setEnabled(!is_running);
 
     particles_spin_->setEnabled(!is_running);
     burn_in_spin_->setEnabled(!is_running);

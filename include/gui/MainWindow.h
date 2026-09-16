@@ -21,6 +21,7 @@ class QLabel;
 class QPlainTextEdit;
 class QProgressBar;
 class QPushButton;
+class QScrollArea;
 class QSpinBox;
 class QString;
 class QThread;
@@ -89,6 +90,7 @@ private:
 
     QDoubleSpinBox* dt_spin_{nullptr};
     QDoubleSpinBox* total_time_spin_{nullptr};
+    QDoubleSpinBox* x0_spin_{nullptr};
 
     QSpinBox* particles_spin_{nullptr};
     QSpinBox* burn_in_spin_{nullptr};

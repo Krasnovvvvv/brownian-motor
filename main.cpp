@@ -9,12 +9,12 @@ int main(
 ) {
     QApplication app{argc, argv};
 
-    app.setWindowIcon(
+    QApplication::setWindowIcon(
         QIcon{":/icons/brownian-motor.png"}
     );
 
     MainWindow window;
     window.show();
 
-    return app.exec();
+    return QApplication::exec();
 }
