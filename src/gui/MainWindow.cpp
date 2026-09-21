@@ -109,6 +109,8 @@ namespace {
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow{parent}
 {
+    setMinimumSize(1100, 600);
+
     create_interface_();
     connect_controls_();
 
