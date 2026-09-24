@@ -2,6 +2,8 @@
 #define BROWNIAN_MOTOR_SIMULATIONWORKER_H
 #pragma once
 
+#include "core/PotentialDefinition.h"
+
 #include <QObject>
 #include <QtGlobal>
 
@@ -9,10 +11,24 @@
 #include <cstdint>
 #include <memory>
 #include <stop_token>
+#include <optional>
 
 struct SimulationRequest final {
     double v1{0.10};
     double v2{0.025};
+
+    /*
+    * Если definition отсутствует, используется
+    * legacy BiharmonicProfile с v1/v2.
+    *
+    * Если definition присутствует, worker создаёт
+    * ExpressionEvaluator из JSON profile.
+    */
+    std::optional<PotentialDefinition>
+        potential_definition;
+
+    PotentialParameterValues
+        potential_parameter_values;
 
     double modulation_amplitude{1.0};
     double epsilon{0.10};

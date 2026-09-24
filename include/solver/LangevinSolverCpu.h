@@ -162,6 +162,34 @@ private:
             gaussian_distributions;
     };
 
+    [[nodiscard]] std::vector<Potential<Profile>>
+    make_worker_potentials_(
+        std::size_t worker_count
+    ) const {
+        std::vector<Potential<Profile>>
+            worker_potentials;
+
+        worker_potentials.reserve(worker_count);
+
+        for (
+            std::size_t worker = 0;
+            worker < worker_count;
+            ++worker
+        ) {
+            /*
+             * Для BiharmonicProfile это обычная дешёвая копия.
+             *
+             * Для ExpressionEvaluator copy constructor заново
+             * строит отдельные ExprTk symbol table и expressions.
+             */
+            worker_potentials.push_back(
+                potential_
+            );
+        }
+
+        return worker_potentials;
+    }
+
     void ensure_fast_mode_() const {
         if (params_.store_trajectory) {
             throw std::invalid_argument(
@@ -188,7 +216,7 @@ private:
 
         state.x_wrapped.assign(
             params_.n_particles,
-            wrap_unit_(params_.x0)
+            evaluation_coordinate_(params_.x0)
         );
 
         state.gaussian_rngs.reserve(params_.n_particles);
@@ -227,6 +255,12 @@ private:
 
         SimulationState state = make_initial_state_();
 
+        std::vector<Potential<Profile>>
+            worker_potentials =
+                make_worker_potentials_(
+                    active_workers
+                );
+
         std::atomic<bool> cancellation_requested{false};
 
         std::vector<PaddedReduction> partial_results(
@@ -254,6 +288,7 @@ private:
             workers.emplace_back(
                 [this,
                  &state,
+                 &worker_potentials,
                  &partial_results,
                  &cancellation_requested,
                  factor_provider,
@@ -263,6 +298,8 @@ private:
                  worker,
                  total_steps,
                  burn_in_steps](const std::stop_token&) mutable {
+                     const Potential<Profile>& worker_potential =
+                         worker_potentials[worker];
                     double local_final_sum = 0.0;
                     double local_burn_in_sum = 0.0;
 
@@ -303,6 +340,7 @@ private:
                                 factor_provider(particle, step);
 
                             advance_particle_(
+                                worker_potential,
                                 x_unwrapped,
                                 x_wrapped,
                                 gaussian_rng,
@@ -393,6 +431,12 @@ private:
 
         SimulationState state = make_initial_state_();
 
+        std::vector<Potential<Profile>>
+            worker_potentials =
+                make_worker_potentials_(
+                    active_workers
+                );
+
         EnsembleResult result;
         result.n_particles = params_.n_particles;
         result.has_trajectory = params_.store_trajectory;
@@ -443,6 +487,7 @@ private:
                 workers.emplace_back(
                     [this,
                      &state,
+                     &worker_potentials,
                      &partial_results,
                      &cancellation_requested,
                      factor_provider,
@@ -455,6 +500,8 @@ private:
                      burn_in_steps](
                         const std::stop_token&
                     ) mutable {
+                        const Potential<Profile>& worker_potential =
+                            worker_potentials[worker];
                         double local_final_sum = 0.0;
                         double local_burn_in_sum = 0.0;
 
@@ -499,6 +546,7 @@ private:
                                     );
 
                                 advance_particle_(
+                                    worker_potential,
                                     x_unwrapped,
                                     x_wrapped,
                                     gaussian_rng,
@@ -610,6 +658,7 @@ private:
     }
 
     void advance_particle_(
+        const Potential<Profile>& potential,
         double& x_unwrapped,
         double& x_wrapped,
         std::mt19937& gaussian_rng,
@@ -620,7 +669,7 @@ private:
             sqrt_2dt_ * gaussian_distribution(gaussian_rng);
 
         const double derivative_now =
-            potential_.derivative_value(
+            potential.derivative_value(
                 x_wrapped,
                 factor
             );
@@ -631,8 +680,8 @@ private:
             thermal_increment;
 
         const double derivative_predicted =
-            potential_.derivative_value(
-                wrap_unit_fast_(predicted_x),
+            potential.derivative_value(
+                evaluation_coordinate_(predicted_x),
                 factor
             );
 
@@ -643,7 +692,34 @@ private:
             thermal_increment;
 
         x_unwrapped += delta_x;
-        x_wrapped = wrap_unit_fast_(x_unwrapped);
+        x_wrapped = evaluation_coordinate_(
+            x_unwrapped
+        );
+    }
+
+    [[nodiscard]] double evaluation_coordinate_(
+        double x
+    ) const noexcept {
+        if (!params_.periodic_profile) {
+            return x;
+        }
+
+        if (params_.spatial_period == 1.0) {
+            return wrap_unit_fast_(x);
+        }
+
+        return wrap_period_(
+            x,
+            params_.spatial_period
+        );
+    }
+
+    [[nodiscard]] static double wrap_period_(
+        double x,
+        double period
+    ) noexcept {
+        return x -
+            period * std::floor(x / period);
     }
 
     [[nodiscard]] static double wrap_unit_fast_(

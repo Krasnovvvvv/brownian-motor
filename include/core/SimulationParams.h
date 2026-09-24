@@ -21,6 +21,20 @@ struct SimulationParams final {
     double x0{};
 
     /*
+    * Параметры spatial profile.
+    *
+    * periodic_profile == true:
+    *     Solver вычисляет potential на координате
+    *     x mod spatial_period.
+    *
+    * periodic_profile == false:
+    *     Solver использует full unwrapped coordinate x.
+    */
+    bool periodic_profile{true};
+
+    double spatial_period{1.0};
+
+    /*
      * Fast solver не строит trajectory во время расчёта:
      * workers работают независимо до самого конца.
      *
@@ -72,6 +86,17 @@ struct SimulationParams final {
         if (!std::isfinite(x0)) {
             throw std::invalid_argument("x0 must be finite");
         }
+
+        if (periodic_profile &&(
+            !std::isfinite(spatial_period) ||
+            spatial_period <= 0.0
+            )
+        )   {
+            throw std::invalid_argument(
+                "spatial_period must be finite and > 0 "
+                "for a periodic profile"
+            );
+            }
 
         if (trajectory_stride == 0) {
             throw std::invalid_argument(

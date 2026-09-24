@@ -1,4 +1,5 @@
 #include "gui/SimulationWorker.h"
+#include "core/ExpressionEvaluator.h"
 
 #include <algorithm>
 #include <chrono>
@@ -28,6 +29,28 @@ SimulationWorker::SimulationWorker(
 
 void SimulationWorker::run() {
     try {
+        /*
+         * Legacy BiharmonicProfile всегда periodic
+         * с period = 1.0.
+         *
+         * JSON potential может быть:
+         * - periodic с любым period;
+         * - non-periodic.
+         */
+        const bool periodic_profile =
+            request_.potential_definition
+                ? request_.potential_definition
+                    ->profile.periodic
+                : true;
+
+        const double spatial_period =
+            request_.potential_definition &&
+            request_.potential_definition
+                ->profile.periodic
+                ? request_.potential_definition
+                    ->profile.period
+                : 1.0;
+
         const SimulationParams simulation_params{
             .dt = request_.dt,
             .total_time = request_.total_time,
@@ -37,6 +60,9 @@ void SimulationWorker::run() {
 
             .x0 = request_.x0,
 
+            .periodic_profile = periodic_profile,
+            .spatial_period = spatial_period,
+
             /*
              * Trajectory нужна только interactive path.
              * Fast mode сохраняет прежнее условие:
@@ -45,7 +71,7 @@ void SimulationWorker::run() {
             .store_trajectory = request_.interactive_mode,
 
             /*
-             * В interactive solver одна точка пока создаётся
+             * В interactive solver одна точка создаётся
              * после каждого batch.
              */
             .trajectory_stride = request_.batch_steps,
@@ -58,13 +84,9 @@ void SimulationWorker::run() {
 
         simulation_params.validate();
 
-        const BiharmonicProfile profile{
-            .V1 = request_.v1,
-            .V2 = request_.v2
+        const SeedFactory seeds{
+            request_.seed
         };
-
-        const Potential potential{profile};
-        const SeedFactory seeds{request_.seed};
 
         const DichotomicParams modulation_params =
             DichotomicParams::symmetric(
@@ -81,44 +103,102 @@ void SimulationWorker::run() {
                 seeds
             );
 
-        LangevinSolverCpu<BiharmonicProfile> solver{
-            potential,
-            simulation_params,
-            seeds,
-            request_.requested_workers
-        };
+        /*
+         * Один generic path для обоих Profile types:
+         *
+         * BiharmonicProfile
+         * ExpressionEvaluator
+         *
+         * LangevinSolverCpu создаётся отдельно под
+         * фактический concrete Profile type.
+         */
+        const auto solve_with_profile =
+            [&]<typename Profile>(
+                Profile profile
+            ) -> EnsembleResult {
+                const Potential<Profile> potential{
+                    std::move(profile)
+                };
+
+                LangevinSolverCpu<Profile> solver{
+                    potential,
+                    simulation_params,
+                    seeds,
+                    request_.requested_workers
+                };
+
+                if (request_.interactive_mode) {
+                    const SimulationObserver observer =
+                        [this](
+                            const SimulationUpdate& update
+                        ) {
+                            emit progress_updated(
+                                static_cast<qulonglong>(
+                                    update.step + 1
+                                ),
+                                static_cast<qulonglong>(
+                                    update.total_steps
+                                ),
+                                update.time,
+                                update.mean_x,
+                                update.mean_velocity
+                            );
+                        };
+
+                    return solver.solve_stochastic_interactive(
+                        modulations,
+                        observer,
+                        cancellation_source_->get_token()
+                    );
+                }
+
+                return solver.solve_stochastic_fast(
+                    modulations,
+                    cancellation_source_->get_token()
+                );
+            };
 
         const auto started_at =
             std::chrono::steady_clock::now();
 
         EnsembleResult result;
 
-        if (request_.interactive_mode) {
-            const SimulationObserver observer =
-                [this](const SimulationUpdate& update) {
-                    emit progress_updated(
-                        static_cast<qulonglong>(
-                            update.step + 1
-                        ),
-                        static_cast<qulonglong>(
-                            update.total_steps
-                        ),
-                        update.time,
-                        update.mean_x,
-                        update.mean_velocity
-                    );
-                };
+        if (request_.potential_definition) {
+            /*
+             * Новый путь:
+             *
+             * JSON config
+             *     ↓
+             * PotentialDefinition
+             *     ↓
+             * ExpressionEvaluator
+             *     ↓
+             * Potential<ExpressionEvaluator>
+             *     ↓
+             * LangevinSolverCpu<ExpressionEvaluator>
+             */
+            ExpressionEvaluator profile{
+                *request_.potential_definition,
+                request_.potential_parameter_values
+            };
 
-            result = solver.solve_stochastic_interactive(
-                modulations,
-                observer,
-                cancellation_source_->get_token()
+            result = solve_with_profile(
+                std::move(profile)
             );
         } else {
-            result = solver.solve_stochastic_fast(
-                modulations,
-                cancellation_source_->get_token()
-            );
+            /*
+             * Старый путь сохраняется полностью.
+             *
+             * Пока MainWindow всё ещё заполняет
+             * request.v1 / request.v2, программа
+             * продолжит считать BiharmonicProfile.
+             */
+            const BiharmonicProfile profile{
+                .V1 = request_.v1,
+                .V2 = request_.v2
+            };
+
+            result = solve_with_profile(profile);
         }
 
         const auto finished_at =
@@ -155,7 +235,10 @@ void SimulationWorker::run() {
 
         const std::size_t workers =
             std::min(
-                std::max(std::size_t{1}, requested_workers),
+                std::max(
+                    std::size_t{1},
+                    requested_workers
+                ),
                 request_.n_particles
             );
 
@@ -168,7 +251,9 @@ void SimulationWorker::run() {
         );
     } catch (const std::exception& exception) {
         emit failed(
-            QString::fromUtf8(exception.what())
+            QString::fromUtf8(
+                exception.what()
+            )
         );
     }
 

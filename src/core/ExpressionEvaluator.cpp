@@ -306,6 +306,7 @@ public:
         const PotentialParameterValues& values
     )
         : definition{source_definition}
+        , parameter_values{values}
     {
         validate_definition(definition);
         validate_parameter_values(
@@ -375,6 +376,13 @@ public:
         }
     }
 
+    Impl(const Impl& other)
+    : Impl(
+        other.definition,
+        other.parameter_values
+    )
+    {}
+
     [[nodiscard]] double value(
         double coordinate_value
     ) noexcept {
@@ -391,6 +399,7 @@ public:
         return derivative_expression.value();
     }
 
+    PotentialParameterValues parameter_values;
     PotentialDefinition definition;
 
     double coordinate{0.0};
@@ -418,6 +427,31 @@ ExpressionEvaluator::ExpressionEvaluator(
 ExpressionEvaluator::~ExpressionEvaluator() = default;
 
 ExpressionEvaluator::ExpressionEvaluator(
+    const ExpressionEvaluator& other
+)
+    : impl_{
+    std::make_unique<Impl>(
+        *other.impl_
+    )
+}
+{}
+
+ExpressionEvaluator&
+ExpressionEvaluator::operator=(
+    const ExpressionEvaluator& other
+) {
+    if (this == &other) {
+        return *this;
+    }
+
+    impl_ = std::make_unique<Impl>(
+        *other.impl_
+    );
+
+    return *this;
+}
+
+ExpressionEvaluator::ExpressionEvaluator(
     ExpressionEvaluator&&
 ) noexcept = default;
 
@@ -425,6 +459,12 @@ ExpressionEvaluator&
 ExpressionEvaluator::operator=(
     ExpressionEvaluator&&
 ) noexcept = default;
+
+double ExpressionEvaluator::operator()(
+    double coordinate
+) const noexcept {
+    return value(coordinate);
+}
 
 double ExpressionEvaluator::value(
     double coordinate

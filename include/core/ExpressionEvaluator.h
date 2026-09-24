@@ -16,12 +16,12 @@ public:
     ~ExpressionEvaluator();
 
     ExpressionEvaluator(
-        const ExpressionEvaluator&
-    ) = delete;
+        const ExpressionEvaluator& other
+    );
 
     ExpressionEvaluator& operator=(
-        const ExpressionEvaluator&
-    ) = delete;
+        const ExpressionEvaluator& other
+    );
 
     ExpressionEvaluator(
         ExpressionEvaluator&&
@@ -30,6 +30,16 @@ public:
     ExpressionEvaluator& operator=(
         ExpressionEvaluator&&
     ) noexcept;
+
+    /*
+    * Позволяет использовать ExpressionEvaluator
+    * как SpatialProfile в Potential<Profile>.
+    *
+    *  Profile(coordinate) == U(coordinate).
+    */
+    [[nodiscard]] double operator()(
+        double coordinate
+    ) const noexcept;
 
     /*
      * Возвращает U(coordinate).
