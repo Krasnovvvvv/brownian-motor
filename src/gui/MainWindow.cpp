@@ -14,9 +14,11 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QLabel>
+#include <QLayout>
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QProgressBar>
@@ -42,6 +44,9 @@
 #include "gui/CompactDoubleSpinBox.h"
 #include "gui/SimulationWorker.h"
 #include "gui/TrajectoryPlotWidget.h"
+
+#include "core/PotentialConfigParser.h"
+#include "gui/PotentialDropArea.h"
 
 namespace {
 
@@ -113,6 +118,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     create_interface_();
     connect_controls_();
+    use_builtin_potential_();
 
     trajectory_dialog_ = new QDialog{nullptr};
 
@@ -796,22 +802,150 @@ void MainWindow::create_interface_() {
     auto* parameters_layout = new QHBoxLayout;
     root_layout->addLayout(parameters_layout);
 
-    auto* potential_group = new QGroupBox{"Potential"};
-    configure_group_title(potential_group);
-    auto* potential_form = new QFormLayout{potential_group};
+auto* potential_group = new QGroupBox{
+    "Potential",
+    central_widget
+};
 
-    v1_spin_ = make_double_spin_box(
-        -100.0, 100.0, 0.2, 8, 0.01
+configure_group_title(
+    potential_group
+);
+
+auto* potential_layout = new QVBoxLayout{
+    potential_group
+};
+
+potential_layout->setContentsMargins(
+    8,
+    12,
+    8,
+    8
+);
+
+potential_layout->setSpacing(6);
+
+auto* potential_buttons_layout =
+    new QHBoxLayout;
+
+open_potential_button_ = new QPushButton{
+    "Open potential...",
+    potential_group
+};
+
+builtin_potential_button_ = new QPushButton{
+    "Use built-in",
+    potential_group
+};
+
+potential_buttons_layout->addWidget(
+    open_potential_button_
+);
+
+potential_buttons_layout->addWidget(
+    builtin_potential_button_
+);
+
+potential_drop_area_ =
+    new PotentialDropArea{
+        potential_group
+    };
+
+potential_info_label_ = new QLabel{
+    "Potential is not selected",
+    potential_group
+};
+
+potential_info_label_->setWordWrap(
+    true
+);
+
+potential_info_label_->setMinimumHeight(
+    36
+);
+
+potential_parameters_scroll_ =
+    new QScrollArea{
+        potential_group
+    };
+
+potential_parameters_scroll_->
+    setWidgetResizable(true);
+
+potential_parameters_scroll_->
+    setFrameShape(
+        QFrame::NoFrame
     );
 
-    v2_spin_ = make_double_spin_box(
-        -100.0, 100.0, 0.1, 8, 0.01
+potential_parameters_scroll_->
+    setHorizontalScrollBarPolicy(
+        Qt::ScrollBarAlwaysOff
     );
 
-    potential_form->addRow("V1:", v1_spin_);
-    potential_form->addRow("V2:", v2_spin_);
+potential_parameters_scroll_->
+    setVerticalScrollBarPolicy(
+        Qt::ScrollBarAsNeeded
+    );
 
-    parameters_layout->addWidget(potential_group, 1);
+potential_parameters_scroll_->
+    setMinimumHeight(70);
+
+auto* potential_parameters_content =
+    new QWidget{
+        potential_parameters_scroll_
+    };
+
+potential_parameters_form_ =
+    new QFormLayout{
+        potential_parameters_content
+    };
+
+potential_parameters_form_->
+    setContentsMargins(
+        2,
+        2,
+        8,
+        2
+    );
+
+potential_parameters_form_->
+    setVerticalSpacing(6);
+
+potential_parameters_form_->
+    setRowWrapPolicy(
+        QFormLayout::WrapLongRows
+    );
+
+potential_parameters_form_->
+    setSizeConstraint(
+        QLayout::SetMinAndMaxSize
+    );
+
+potential_parameters_scroll_->
+    setWidget(
+        potential_parameters_content
+    );
+
+potential_layout->addLayout(
+    potential_buttons_layout
+);
+
+potential_layout->addWidget(
+    potential_drop_area_
+);
+
+potential_layout->addWidget(
+    potential_info_label_
+);
+
+potential_layout->addWidget(
+    potential_parameters_scroll_,
+    1
+);
+
+parameters_layout->addWidget(
+    potential_group,
+    1
+);
 
     auto* modulation_group =
         new QGroupBox{"Modulation"};
@@ -1181,6 +1315,48 @@ void MainWindow::connect_controls_() {
             update_show_graph_button_();
         }
     );
+
+    connect(
+    open_potential_button_,
+    &QPushButton::clicked,
+    this,
+    [this] {
+        const QString file_name =
+            QFileDialog::getOpenFileName(
+                this,
+                "Open potential configuration",
+                QDir::homePath(),
+                "Potential configuration "
+                "(*.bmpotential *.json)"
+            );
+
+        if (!file_name.isEmpty()) {
+            load_potential_file_(
+                file_name
+            );
+        }
+    }
+);
+
+    connect(
+        builtin_potential_button_,
+        &QPushButton::clicked,
+        this,
+        [this] {
+            use_builtin_potential_();
+        }
+    );
+
+    connect(
+        potential_drop_area_,
+        &PotentialDropArea::file_dropped,
+        this,
+        [this](const QString& file_name) {
+            load_potential_file_(
+                file_name
+            );
+        }
+    );
 }
 
 SimulationRequest MainWindow::request_from_controls_() const {
@@ -1188,8 +1364,25 @@ SimulationRequest MainWindow::request_from_controls_() const {
         mode_combo_->currentData().toBool();
 
     return SimulationRequest{
-        .v1 = v1_spin_->value(),
-        .v2 = v2_spin_->value(),
+        .v1 =
+            active_potential_definition_
+                ? 0.0
+                : potential_parameter_spins_
+                      .value("V1")
+                      ->value(),
+
+        .v2 =
+            active_potential_definition_
+                ? 0.0
+                : potential_parameter_spins_
+                      .value("V2")
+                      ->value(),
+
+        .potential_definition =
+            active_potential_definition_,
+
+        .potential_parameter_values =
+            potential_values_from_controls_(),
 
         .modulation_amplitude =
             amplitude_spin_->value(),
@@ -1290,6 +1483,18 @@ void MainWindow::update_elapsed_time_() {
 
 void MainWindow::start_simulation_() {
     if (simulation_thread_) {
+        return;
+    }
+
+    if (
+    potential_state_ !=
+        PotentialState::Ready
+    ){
+        append_log_(
+            "Simulation blocked: select a valid "
+            "potential or use the built-in profile."
+        );
+
         return;
     }
 
@@ -2334,13 +2539,9 @@ bool MainWindow::eventFilter(
 }
 
 void MainWindow::set_running_state_(bool is_running) {
-    run_button_->setEnabled(!is_running);
     cancel_button_->setEnabled(is_running);
 
     mode_combo_->setEnabled(!is_running);
-
-    v1_spin_->setEnabled(!is_running);
-    v2_spin_->setEnabled(!is_running);
 
     amplitude_spin_->setEnabled(!is_running);
     epsilon_spin_->setEnabled(!is_running);
@@ -2355,6 +2556,9 @@ void MainWindow::set_running_state_(bool is_running) {
     seed_spin_->setEnabled(!is_running);
     workers_spin_->setEnabled(!is_running);
 
+    update_potential_controls_(
+        is_running
+    );
     update_show_graph_button_();
     update_plot_tools_();
 }
@@ -2363,6 +2567,419 @@ void MainWindow::append_log_(
     const QString& message
 ) {
     log_output_->appendPlainText(message);
+}
+
+void MainWindow::rebuild_potential_fields_(
+    const std::vector<
+        PotentialParameterDefinition
+    >& parameters
+) {
+    potential_parameter_spins_.clear();
+
+    while (
+        potential_parameters_form_->rowCount() > 0
+    ) {
+        potential_parameters_form_->
+            removeRow(0);
+    }
+
+    for (const auto& parameter : parameters) {
+        auto* spin = make_double_spin_box(
+            parameter.minimum,
+            parameter.maximum,
+            parameter.default_value,
+            parameter.decimals,
+            parameter.step
+        );
+
+        spin->setToolTip(
+            QString::fromStdString(
+                parameter.description
+            )
+        );
+
+        const QString label =
+            QString::fromStdString(
+                parameter.label
+            );
+
+        const QString id =
+            QString::fromStdString(
+                parameter.id
+            );
+
+        potential_parameters_form_->addRow(
+            label + ":",
+            spin
+        );
+
+        potential_parameter_spins_.insert(
+            id,
+            spin
+        );
+    }
+}
+
+PotentialParameterValues
+MainWindow::potential_values_from_controls_() const {
+    PotentialParameterValues values;
+
+    for (
+        auto iterator =
+            potential_parameter_spins_.cbegin();
+
+        iterator !=
+            potential_parameter_spins_.cend();
+
+        ++iterator
+    ) {
+        values.emplace(
+            iterator.key().toStdString(),
+            iterator.value()->value()
+        );
+    }
+
+    return values;
+}
+
+void MainWindow::use_builtin_potential_() {
+    if (
+        simulation_thread_ ||
+        potential_state_ ==
+            PotentialState::Validating
+    ) {
+        return;
+    }
+
+    const std::vector<
+        PotentialParameterDefinition
+    > parameters{
+        PotentialParameterDefinition{
+            .id = "V1",
+            .label = "V₁",
+            .description =
+                "Amplitude of the first harmonic.",
+            .default_value = 0.20,
+            .minimum = -100.0,
+            .maximum = 100.0,
+            .step = 0.01,
+            .decimals = 8
+        },
+
+        PotentialParameterDefinition{
+            .id = "V2",
+            .label = "V₂",
+            .description =
+                "Amplitude of the second harmonic.",
+            .default_value = 0.10,
+            .minimum = -100.0,
+            .maximum = 100.0,
+            .step = 0.01,
+            .decimals = 8
+        }
+    };
+
+    rebuild_potential_fields_(
+        parameters
+    );
+
+    active_potential_definition_.reset();
+
+    potential_state_ =
+        PotentialState::Ready;
+
+    potential_info_label_->setText(
+        "Built-in biharmonic profile\n"
+        "Periodic; period = 1"
+    );
+
+    potential_drop_area_->set_message(
+        "Built-in profile selected. "
+        "Drop a potential file to replace it."
+    );
+
+    update_potential_controls_(
+        false
+    );
+
+    append_log_(
+        "Selected built-in biharmonic profile."
+    );
+
+    log_experiment_event_(
+        "potential_builtin_selected"
+    );
+}
+
+void MainWindow::update_potential_controls_(
+    bool is_running
+) {
+    const bool validating =
+        potential_state_ ==
+        PotentialState::Validating;
+
+    run_button_->setEnabled(
+        !is_running &&
+        potential_state_ ==
+            PotentialState::Ready
+    );
+
+    open_potential_button_->setEnabled(
+        !is_running &&
+        !validating
+    );
+
+    builtin_potential_button_->setEnabled(
+        !is_running &&
+        !validating
+    );
+
+    potential_drop_area_->setEnabled(
+        !is_running &&
+        !validating
+    );
+
+    potential_parameters_scroll_->setEnabled(
+        !is_running &&
+        potential_state_ ==
+            PotentialState::Ready
+    );
+}
+
+void MainWindow::load_potential_file_(
+    const QString& file_name
+) {
+    if (
+        simulation_thread_ ||
+        potential_state_ ==
+            PotentialState::Validating
+    ) {
+        return;
+    }
+
+    potential_state_ =
+        PotentialState::Validating;
+
+    potential_drop_area_->set_message(
+        "Validating potential..."
+    );
+
+    update_potential_controls_(
+        false
+    );
+
+    QTimer::singleShot(
+        0,
+        this,
+        [this, file_name] {
+            const QFileInfo file_info{
+                file_name
+            };
+
+            QString failure_reason;
+
+            if (
+                !file_name.endsWith(
+                    ".bmpotential",
+                    Qt::CaseInsensitive
+                ) &&
+                !file_name.endsWith(
+                    ".json",
+                    Qt::CaseInsensitive
+                )
+            ) {
+                failure_reason =
+                    "Expected a .bmpotential "
+                    "or .json file.";
+            } else if (
+                file_info.exists() &&
+                file_info.size() >
+                    1'048'576
+            ) {
+                failure_reason =
+                    "Potential file exceeds "
+                    "the 1 MiB limit.";
+            }
+
+            PotentialConfigParseResult result;
+
+            if (failure_reason.isEmpty()) {
+                result =
+                    PotentialConfigParser::
+                        parse_file(
+                            file_name
+                        );
+
+                if (
+                    !result.is_success()
+                ) {
+                    failure_reason =
+                        result.error_message;
+                }
+            }
+
+            if (
+                !failure_reason.isEmpty()
+            ) {
+                potential_state_ =
+                    PotentialState::Invalid;
+
+                potential_drop_area_->set_message(
+                    "Invalid potential. "
+                    "Load another file or use built-in.",
+                    failure_reason
+                );
+
+                potential_info_label_->setText(
+                    "Potential validation failed.\n"
+                    "Simulation is disabled."
+                );
+
+                append_log_(
+                    QString{
+                        "Potential rejected: %1\n%2"
+                    }
+                        .arg(
+                            file_name,
+                            failure_reason
+                        )
+                );
+
+                log_experiment_event_(
+                    "potential_rejected",
+                    QJsonObject{
+                        {
+                            "file_path",
+                            file_info
+                                .absoluteFilePath()
+                        },
+                        {
+                            "error",
+                            failure_reason
+                        }
+                    }
+                );
+
+                update_potential_controls_(
+                    false
+                );
+
+                return;
+            }
+
+            const PotentialDefinition&
+                definition =
+                    *result.definition;
+
+            rebuild_potential_fields_(
+                definition.parameters
+            );
+
+            active_potential_definition_ =
+                std::move(
+                    result.definition
+                );
+
+            potential_state_ =
+                PotentialState::Ready;
+
+            const auto& active =
+                *active_potential_definition_;
+
+            potential_info_label_->setText(
+                QString{
+                    "%1\n%2"
+                }
+                    .arg(
+                        QString::fromStdString(
+                            active.name
+                        ),
+                        active.profile.periodic
+                            ? QString{
+                                "Periodic; period = %1"
+                            }.arg(
+                                active.profile.period,
+                                0,
+                                'g',
+                                12
+                            )
+                            : QString{
+                                "Non-periodic"
+                            }
+                    )
+            );
+
+            potential_drop_area_->set_message(
+                QString{
+                    "Loaded: %1"
+                }.arg(
+                    QString::fromStdString(
+                        active.name
+                    )
+                ),
+                file_info.absoluteFilePath()
+            );
+
+            append_log_(
+                QString{
+                    "Potential loaded: %1\n%2"
+                }.arg(
+                    QString::fromStdString(
+                        active.name
+                    ),
+                    file_info.absoluteFilePath()
+                )
+            );
+
+            QJsonArray warnings;
+
+            for (
+                const QString& warning :
+                result.warnings
+            ) {
+                warnings.append(
+                    warning
+                );
+
+                append_log_(
+                    QString{
+                        "Potential warning: %1"
+                    }.arg(warning)
+                );
+            }
+
+            log_experiment_event_(
+                "potential_loaded",
+                QJsonObject{
+                    {
+                        "id",
+                        QString::fromStdString(
+                            active.id
+                        )
+                    },
+                    {
+                        "name",
+                        QString::fromStdString(
+                            active.name
+                        )
+                    },
+                    {
+                        "file_path",
+                        file_info
+                            .absoluteFilePath()
+                    },
+                    {
+                        "warnings",
+                        warnings
+                    }
+                }
+            );
+
+            update_potential_controls_(
+                false
+            );
+        }
+    );
 }
 
 void MainWindow::log_experiment_event_(

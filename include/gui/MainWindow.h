@@ -3,20 +3,25 @@
 #pragma once
 
 #include <QElapsedTimer>
+#include <QHash>
 #include <QJsonObject>
 #include <QMainWindow>
 #include <QTimer>
 
 #include <memory>
+#include <optional>
+#include <vector>
 #include <stop_token>
 
 #include "core/ExperimentLogger.h"
+#include "core/PotentialDefinition.h"
 
 class QComboBox;
 class QCheckBox;
 class QDoubleSpinBox;
 class QDialog;
 class QEvent;
+class QFormLayout;
 class QLabel;
 class QPlainTextEdit;
 class QProgressBar;
@@ -29,6 +34,7 @@ class QThread;
 class SimulationWorker;
 struct SimulationRequest;
 class TrajectoryPlotWidget;
+class PotentialDropArea;
 
 class MainWindow final : public QMainWindow {
 public:
@@ -81,8 +87,49 @@ private:
     void set_running_state_(bool is_running);
     void append_log_(const QString& message);
 
-    QDoubleSpinBox* v1_spin_{nullptr};
-    QDoubleSpinBox* v2_spin_{nullptr};
+    void load_potential_file_(
+        const QString& file_name
+    );
+
+    void use_builtin_potential_();
+
+    void rebuild_potential_fields_(
+        const std::vector<PotentialParameterDefinition>&
+            parameters
+    );
+
+    [[nodiscard]] PotentialParameterValues
+    potential_values_from_controls_() const;
+
+    void update_potential_controls_(
+        bool is_running
+    );
+
+    enum class PotentialState {
+        Ready,
+        Validating,
+        Invalid
+    };
+
+    QPushButton* open_potential_button_{nullptr};
+    QPushButton* builtin_potential_button_{nullptr};
+
+    PotentialDropArea* potential_drop_area_{nullptr};
+
+    QLabel* potential_info_label_{nullptr};
+
+    QScrollArea* potential_parameters_scroll_{nullptr};
+    QFormLayout* potential_parameters_form_{nullptr};
+
+    QHash<QString, QDoubleSpinBox*>
+        potential_parameter_spins_;
+
+    std::optional<PotentialDefinition>
+        active_potential_definition_;
+
+    PotentialState potential_state_{
+        PotentialState::Invalid
+    };
 
     QDoubleSpinBox* amplitude_spin_{nullptr};
     QDoubleSpinBox* epsilon_spin_{nullptr};

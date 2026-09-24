@@ -52,6 +52,9 @@ add_executable(brownian-motor
         include/core/PotentialConfigParser.h
         src/core/PotentialConfigParser.cpp
 
+        include/gui/PotentialDropArea.h
+        src/gui/PotentialDropArea.cpp
+
         resources/icons.qrc
         ${app_icon_resource_windows}
 )
