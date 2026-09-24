@@ -1,6 +1,6 @@
 #include "core/PotentialConfigParser.h"
-
 #include "core/ExpressionEvaluator.h"
+#include "core/PotentialDerivativeCheck.h"
 
 #include <QDir>
 #include <QFile>
@@ -458,6 +458,21 @@ constexpr const char* expected_format =
                 return false;
             }
         }
+        if (
+            const auto derivative_error =
+                check_potential_derivative(
+                    definition,
+                    evaluator
+                )
+        ) {
+            error_message =
+                QString::fromStdString(
+                    *derivative_error
+                );
+
+            return false;
+        }
+
     } catch (const std::exception& exception) {
         error_message = QString{
             "Invalid profile expression: %1"

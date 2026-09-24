@@ -55,6 +55,9 @@ add_executable(brownian-motor
         include/gui/PotentialDropArea.h
         src/gui/PotentialDropArea.cpp
 
+        include/core/PotentialDerivativeCheck.h
+        src/core/PotentialDerivativeCheck.cpp
+
         resources/icons.qrc
         ${app_icon_resource_windows}
 )
@@ -122,6 +125,9 @@ if (BUILD_TESTING)
 
             include/core/PotentialConfigParser.h
             src/core/PotentialConfigParser.cpp
+
+            include/core/PotentialDerivativeCheck.h
+            src/core/PotentialDerivativeCheck.cpp
     )
 
     target_include_directories(
@@ -146,5 +152,46 @@ if (BUILD_TESTING)
     add_test(
             NAME potential-config-parser-smoke-test
             COMMAND potential-config-parser-smoke-test
+    )
+
+    add_executable(
+            potential-equivalence-test
+
+            tests/PotentialEquivalenceTest.cpp
+
+            include/core/PotentialDefinition.h
+
+            include/core/ExpressionEvaluator.h
+            src/core/ExpressionEvaluator.cpp
+
+            include/core/PotentialDerivativeCheck.h
+            src/core/PotentialDerivativeCheck.cpp
+
+            include/core/PotentialConfigParser.h
+            src/core/PotentialConfigParser.cpp
+    )
+
+    target_include_directories(
+            potential-equivalence-test
+            PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${EXPRTK_INCLUDE_DIR}
+    )
+
+    target_link_libraries(
+            potential-equivalence-test
+            PRIVATE
+            Qt6::Core
+    )
+
+    target_compile_definitions(
+            potential-equivalence-test
+            PRIVATE
+            "BROWNIAN_MOTOR_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+    )
+
+    add_test(
+            NAME potential-equivalence-test
+            COMMAND potential-equivalence-test
     )
 endif()

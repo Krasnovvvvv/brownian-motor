@@ -40,6 +40,7 @@
 #include <cstdint>
 #include <memory>
 #include <thread>
+#include <exception>
 
 #include "gui/CompactDoubleSpinBox.h"
 #include "gui/SimulationWorker.h"
@@ -47,6 +48,9 @@
 
 #include "core/PotentialConfigParser.h"
 #include "gui/PotentialDropArea.h"
+
+#include "core/ExpressionEvaluator.h"
+#include "core/PotentialDerivativeCheck.h"
 
 namespace {
 
@@ -1516,6 +1520,63 @@ void MainWindow::start_simulation_() {
         );
 
         return;
+    }
+
+    if (request.potential_definition) {
+        try {
+            const ExpressionEvaluator evaluator{
+                *request.potential_definition,
+                request.potential_parameter_values
+            };
+
+            const auto derivative_error =
+                check_potential_derivative(
+                    *request.potential_definition,
+                    evaluator
+                );
+
+            if (derivative_error) {
+                const QString message =
+                    QString::fromStdString(
+                        *derivative_error
+                    );
+
+                append_log_(
+                    QString{
+                        "Simulation start rejected: %1"
+                    }.arg(message)
+                );
+
+                QMessageBox::warning(
+                    this,
+                    "Potential validation failed",
+                    message
+                );
+
+                return;
+            }
+        } catch (
+            const std::exception& exception
+        ) {
+            const QString message =
+                QString::fromUtf8(
+                    exception.what()
+                );
+
+            append_log_(
+                QString{
+                    "Simulation start rejected: %1"
+                }.arg(message)
+            );
+
+            QMessageBox::warning(
+                this,
+                "Potential validation failed",
+                message
+            );
+
+            return;
+        }
     }
 
     const std::size_t total_steps =
