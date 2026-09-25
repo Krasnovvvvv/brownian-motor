@@ -194,4 +194,78 @@ if (BUILD_TESTING)
             NAME potential-equivalence-test
             COMMAND potential-equivalence-test
     )
+
+    add_executable(
+            potential-performance-benchmark
+
+            tests/PotentialPerformanceBenchmark.cpp
+
+            src/core/ExpressionEvaluator.cpp
+            src/core/PotentialDerivativeCheck.cpp
+            src/core/PotentialConfigParser.cpp
+    )
+
+    target_include_directories(
+            potential-performance-benchmark
+            PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${EXPRTK_INCLUDE_DIR}
+    )
+
+    target_link_libraries(
+            potential-performance-benchmark
+            PRIVATE
+            Qt6::Core
+    )
+
+    target_compile_definitions(
+            potential-performance-benchmark
+            PRIVATE
+            "BROWNIAN_MOTOR_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+    )
+
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(
+                potential-performance-benchmark
+                PRIVATE
+                $<$<CONFIG:Release>:-O3>
+                $<$<CONFIG:Release>:-march=native>
+        )
+    endif()
+
+    add_executable(
+            potential-lookup-benchmark
+            tests/PotentialLookupBenchmark.cpp
+            src/core/ExpressionEvaluator.cpp
+            src/core/PotentialDerivativeCheck.cpp
+            src/core/PotentialConfigParser.cpp
+    )
+
+    target_include_directories(
+            potential-lookup-benchmark
+            PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${EXPRTK_INCLUDE_DIR}
+    )
+
+    target_link_libraries(
+            potential-lookup-benchmark
+            PRIVATE
+            Qt6::Core
+    )
+
+    target_compile_definitions(
+            potential-lookup-benchmark
+            PRIVATE
+            "BROWNIAN_MOTOR_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+    )
+
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(
+                potential-lookup-benchmark
+                PRIVATE
+                $<$<CONFIG:Release>:-O3>
+                $<$<CONFIG:Release>:-march=native>
+        )
+    endif()
 endif()
