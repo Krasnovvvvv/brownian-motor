@@ -7,9 +7,11 @@
 #include <cmath>
 #include <concepts>
 #include <cstddef>
+#include <optional>
 #include <random>
 #include <stdexcept>
 #include <stop_token>
+#include <string>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -152,6 +154,15 @@ public:
     }
 
 private:
+    struct NumericalFailure final {
+        std::size_t particle{};
+        std::size_t step{};
+
+        double position{};
+
+        const char* reason{};
+    };
+
     struct SimulationState final {
         std::vector<double> x_unwrapped;
         std::vector<double> x_wrapped;
@@ -161,6 +172,39 @@ private:
         std::vector<std::normal_distribution<double>>
             gaussian_distributions;
     };
+
+    static void throw_if_numerical_failure_(
+        const std::vector<
+            std::optional<NumericalFailure>
+        >& failures
+    ) {
+        for (const auto& failure : failures) {
+            if (!failure) {
+                continue;
+            }
+
+            throw std::runtime_error(
+                "Non-finite simulation value: " +
+                std::string{
+                    failure->reason
+                        ? failure->reason
+                        : "unknown cause"
+                } +
+                "; particle = " +
+                std::to_string(
+                    failure->particle + 1
+                ) +
+                "; step = " +
+                std::to_string(
+                    failure->step + 1
+                ) +
+                "; previous x = " +
+                std::to_string(
+                    failure->position
+                )
+            );
+        }
+    }
 
     [[nodiscard]] std::vector<Potential<Profile>>
     make_worker_potentials_(
@@ -267,6 +311,12 @@ private:
             active_workers
         );
 
+        std::vector<
+            std::optional<NumericalFailure>
+        > numerical_failures(
+            active_workers
+        );
+
         const std::size_t particles_per_worker =
             (params_.n_particles + active_workers - 1) /
             active_workers;
@@ -290,6 +340,7 @@ private:
                  &state,
                  &worker_potentials,
                  &partial_results,
+                 &numerical_failures,
                  &cancellation_requested,
                  factor_provider,
                  stop_token,
@@ -339,18 +390,41 @@ private:
                             const double factor =
                                 factor_provider(particle, step);
 
-                            advance_particle_(
-                                worker_potential,
-                                x_unwrapped,
-                                x_wrapped,
-                                gaussian_rng,
-                                gaussian_distribution,
-                                factor
-                            );
+                            const double previous_x =
+                                x_unwrapped;
+
+                            const char* failure_reason =
+                                nullptr;
+
+                            if (
+                                !advance_particle_(
+                                    worker_potential,
+                                    x_unwrapped,
+                                    x_wrapped,
+                                    gaussian_rng,
+                                    gaussian_distribution,
+                                    factor,
+                                    failure_reason
+                                )
+                            ) {
+                                numerical_failures[worker] =
+                                    NumericalFailure{
+                                        .particle = particle,
+                                        .step = step,
+                                        .position = previous_x,
+                                        .reason = failure_reason
+                                    };
+
+                                break;
+                            }
 
                             if (step + 1 == burn_in_steps) {
                                 x_at_burn_in = x_unwrapped;
                             }
+                        }
+
+                        if (numerical_failures[worker]) {
+                            break;
                         }
 
                         local_final_sum += x_unwrapped;
@@ -367,6 +441,10 @@ private:
         }
 
         workers.clear();
+
+        throw_if_numerical_failure_(
+            numerical_failures
+        );
 
         double final_position_sum = 0.0;
         double burn_in_position_sum = 0.0;
@@ -470,6 +548,12 @@ private:
                 active_workers
             );
 
+            std::vector<
+                std::optional<NumericalFailure>
+            > numerical_failures(
+                active_workers
+            );
+
             std::vector<std::jthread> workers;
             workers.reserve(active_workers);
 
@@ -488,6 +572,7 @@ private:
                     [this,
                      &state,
                      &worker_potentials,
+                     &numerical_failures,
                      &partial_results,
                      &cancellation_requested,
                      factor_provider,
@@ -545,18 +630,41 @@ private:
                                         step
                                     );
 
-                                advance_particle_(
-                                    worker_potential,
-                                    x_unwrapped,
-                                    x_wrapped,
-                                    gaussian_rng,
-                                    gaussian_distribution,
-                                    factor
-                                );
+                                const double previous_x =
+                                    x_unwrapped;
+
+                                const char* failure_reason =
+                                    nullptr;
+
+                                if (
+                                    !advance_particle_(
+                                        worker_potential,
+                                        x_unwrapped,
+                                        x_wrapped,
+                                        gaussian_rng,
+                                        gaussian_distribution,
+                                        factor,
+                                        failure_reason
+                                    )
+                                ) {
+                                    numerical_failures[worker] =
+                                        NumericalFailure{
+                                            .particle = particle,
+                                            .step = step,
+                                            .position = previous_x,
+                                            .reason = failure_reason
+                                        };
+
+                                    break;
+                                }
 
                                 if (step + 1 == burn_in_steps) {
                                     x_at_burn_in = x_unwrapped;
                                 }
+                            }
+
+                            if (numerical_failures[worker]) {
+                                break;
                             }
 
                             local_final_sum += x_unwrapped;
@@ -578,6 +686,10 @@ private:
             }
 
             workers.clear();
+
+            throw_if_numerical_failure_(
+                numerical_failures
+            );
 
             if (cancellation_requested.load(
                     std::memory_order_acquire)) {
@@ -657,44 +769,150 @@ private:
         return result;
     }
 
-    void advance_particle_(
+    [[nodiscard]] bool advance_particle_(
         const Potential<Profile>& potential,
         double& x_unwrapped,
         double& x_wrapped,
         std::mt19937& gaussian_rng,
-        std::normal_distribution<double>& gaussian_distribution,
-        double factor
+        std::normal_distribution<double>&
+            gaussian_distribution,
+        double factor,
+        const char*& failure_reason
     ) const noexcept {
-        const double thermal_increment =
-            sqrt_2dt_ * gaussian_distribution(gaussian_rng);
+    failure_reason = nullptr;
 
-        const double derivative_now =
-            potential.derivative_value(
-                x_wrapped,
-                factor
-            );
+    if (!std::isfinite(factor)) {
+        failure_reason =
+            "modulation factor is not finite";
 
-        const double predicted_x =
-            x_unwrapped -
-            derivative_now * params_.dt +
-            thermal_increment;
+        return false;
+    }
 
-        const double derivative_predicted =
-            potential.derivative_value(
-                evaluation_coordinate_(predicted_x),
-                factor
-            );
-
-        const double delta_x =
-            -0.5 *
-            (derivative_now + derivative_predicted) *
-            params_.dt +
-            thermal_increment;
-
-        x_unwrapped += delta_x;
-        x_wrapped = evaluation_coordinate_(
-            x_unwrapped
+    const double thermal_increment =
+        sqrt_2dt_ *
+        gaussian_distribution(
+            gaussian_rng
         );
+
+    if (!std::isfinite(thermal_increment)) {
+        failure_reason =
+            "thermal increment is not finite";
+
+        return false;
+    }
+
+    const double derivative_now =
+        potential.derivative_value(
+            x_wrapped,
+            factor
+        );
+
+    if (!std::isfinite(derivative_now)) {
+        failure_reason =
+            "potential derivative at "
+            "current position is not finite";
+
+        return false;
+    }
+
+    const double predicted_x =
+        x_unwrapped -
+        derivative_now * params_.dt +
+        thermal_increment;
+
+    if (!std::isfinite(predicted_x)) {
+        failure_reason =
+            "predicted position is not finite";
+
+        return false;
+    }
+
+    const double predicted_coordinate =
+        evaluation_coordinate_(
+            predicted_x
+        );
+
+    if (
+        !std::isfinite(
+            predicted_coordinate
+        )
+    ) {
+        failure_reason =
+            "wrapped predicted position "
+            "is not finite";
+
+        return false;
+    }
+
+    const double derivative_predicted =
+        potential.derivative_value(
+            predicted_coordinate,
+            factor
+        );
+
+    if (
+        !std::isfinite(
+            derivative_predicted
+        )
+    ) {
+        failure_reason =
+            "potential derivative at "
+            "predicted position is not finite";
+
+        return false;
+    }
+
+    const double delta_x =
+        -0.5 *
+        (
+            derivative_now +
+            derivative_predicted
+        ) *
+        params_.dt +
+        thermal_increment;
+
+    if (!std::isfinite(delta_x)) {
+        failure_reason =
+            "position increment is not finite";
+
+        return false;
+    }
+
+    const double next_x =
+        x_unwrapped + delta_x;
+
+    if (!std::isfinite(next_x)) {
+        failure_reason =
+            "new position is not finite";
+
+        return false;
+    }
+
+    const double next_coordinate =
+        evaluation_coordinate_(
+            next_x
+        );
+
+    if (
+        !std::isfinite(
+            next_coordinate
+        )
+    ) {
+        failure_reason =
+            "wrapped new position "
+            "is not finite";
+
+        return false;
+    }
+
+        /*
+        * Состояние частицы обновляем только после
+        * прохождения всех проверок.
+         */
+        x_unwrapped = next_x;
+        x_wrapped = next_coordinate;
+
+        return true;
     }
 
     [[nodiscard]] double evaluation_coordinate_(
