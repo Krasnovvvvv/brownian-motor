@@ -49,6 +49,14 @@ struct SimulationRequest final {
     std::size_t cancellation_check_steps{4'096};
 
     bool interactive_mode{false};
+
+    /*
+    * Approximate derivative evaluation for periodic
+    * JSON potentials only.
+    */
+    bool use_lookup_table{false};
+
+    std::size_t lookup_intervals{16'384};
 };
 
 class SimulationWorker final : public QObject {
@@ -88,6 +96,12 @@ public slots:
     void failed(const QString& message);
 
     void finished();
+
+    void profile_prepared(
+        const QString& backend,
+        qulonglong intervals,
+        double preparation_seconds
+    );
 
 private:
     SimulationRequest request_;

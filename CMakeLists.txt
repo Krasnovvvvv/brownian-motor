@@ -58,6 +58,8 @@ add_executable(brownian-motor
         include/core/PotentialDerivativeCheck.h
         src/core/PotentialDerivativeCheck.cpp
 
+        include/profiles/TabulatedPeriodicProfile.h
+
         resources/icons.qrc
         ${app_icon_resource_windows}
 )

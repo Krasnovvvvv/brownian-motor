@@ -145,6 +145,7 @@ private:
     QSpinBox* workers_spin_{nullptr};
 
     QComboBox* mode_combo_{nullptr};
+    QCheckBox* lookup_table_check_{nullptr};
 
     QPushButton* run_button_{nullptr};
     QPushButton* cancel_button_{nullptr};

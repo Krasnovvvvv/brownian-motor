@@ -1124,10 +1124,30 @@ mode_combo_->setToolTip(
     "real progress updates."
 );
 
+    lookup_table_check_ = new QCheckBox(
+        "Approximate periodic force",
+        simulation_content
+    );
+
+    lookup_table_check_->setChecked(false);
+
+    lookup_table_check_->setToolTip(
+        "Use a linearly interpolated derivative table "
+        "with 16384 intervals per spatial period. "
+        "Available for periodic JSON potentials only. "
+        "This changes force evaluation and introduces "
+        "an interpolation error."
+    );
+
 simulation_form->addRow(
     "Mode",
     mode_combo_
 );
+
+    simulation_form->addRow(
+        "Force evaluation",
+        lookup_table_check_
+    );
 
 simulation_form->addRow(
     "dt",
@@ -1417,7 +1437,12 @@ SimulationRequest MainWindow::request_from_controls_() const {
 
         .batch_steps = 3'500,
         .cancellation_check_steps = 4'096,
-        .interactive_mode = interactive_mode
+        .interactive_mode = interactive_mode,
+
+        .use_lookup_table =
+            lookup_table_check_->isChecked(),
+
+        .lookup_intervals = 16'384
     };
 }
 
@@ -1638,6 +1663,54 @@ void MainWindow::start_simulation_() {
         request,
         cancellation_source_
     };
+
+    connect(
+    simulation_worker_,
+    &SimulationWorker::profile_prepared,
+    this,
+    [this](
+        const QString& backend,
+        qulonglong intervals,
+        double preparation_seconds
+    ) {
+        append_log_(
+            QString(
+                "Force backend: %1; "
+                "lookup intervals: %2; "
+                "profile preparation: %3 s"
+            )
+                .arg(backend)
+                .arg(intervals)
+                .arg(
+                    preparation_seconds,
+                    0,
+                    'f',
+                    6
+                )
+        );
+
+        log_experiment_event_(
+            "potential_backend_prepared",
+            QJsonObject{
+                {
+                    "backend",
+                    backend
+                },
+                {
+                    "lookup_intervals",
+                    static_cast<qint64>(
+                        intervals
+                    )
+                },
+                {
+                    "preparation_seconds",
+                    preparation_seconds
+                }
+            }
+        );
+    },
+    Qt::QueuedConnection
+);
 
     simulation_worker_->moveToThread(
         simulation_thread_
@@ -2108,7 +2181,19 @@ void MainWindow::start_simulation_() {
             static_cast<qint64>(
                 request.cancellation_check_steps
             )
-        }
+        },
+        {
+            "use_lookup_table",
+                request.use_lookup_table
+        },
+        {
+            "lookup_intervals",
+                static_cast<qint64>(
+                request.use_lookup_table
+                ? request.lookup_intervals
+                : 0
+                )
+            }
     }
 );
 
@@ -2805,6 +2890,20 @@ void MainWindow::update_potential_controls_(
         potential_state_ ==
             PotentialState::Ready
     );
+
+    const bool lookup_available =
+    potential_state_ == PotentialState::Ready &&
+    active_potential_definition_.has_value() &&
+    active_potential_definition_->profile.periodic;
+
+    lookup_table_check_->setEnabled(
+        !is_running &&
+        lookup_available
+    );
+
+    if (!lookup_available) {
+        lookup_table_check_->setChecked(false);
+    }
 }
 
 void MainWindow::load_potential_file_(

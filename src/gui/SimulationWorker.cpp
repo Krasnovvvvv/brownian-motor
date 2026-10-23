@@ -17,6 +17,8 @@
 #include "profiles/BiharmonicProfile.h"
 #include "solver/LangevinSolverCpu.h"
 
+#include "profiles/TabulatedPeriodicProfile.h"
+
 SimulationWorker::SimulationWorker(
     SimulationRequest request,
     std::shared_ptr<std::stop_source> cancellation_source,
@@ -50,6 +52,19 @@ void SimulationWorker::run() {
                 ? request_.potential_definition
                     ->profile.period
                 : 1.0;
+
+        if (
+            request_.use_lookup_table &&
+            (
+                !request_.potential_definition ||
+                !periodic_profile
+            )
+        ) {
+            throw std::invalid_argument(
+                "Lookup mode requires a periodic "
+                "JSON potential"
+            );
+        }
 
         const SimulationParams simulation_params{
             .dt = request_.dt,
@@ -164,39 +179,70 @@ void SimulationWorker::run() {
         EnsembleResult result;
 
         if (request_.potential_definition) {
-            /*
-             * Новый путь:
-             *
-             * JSON config
-             *     ↓
-             * PotentialDefinition
-             *     ↓
-             * ExpressionEvaluator
-             *     ↓
-             * Potential<ExpressionEvaluator>
-             *     ↓
-             * LangevinSolverCpu<ExpressionEvaluator>
-             */
-            ExpressionEvaluator profile{
+            const auto preparation_started_at =
+                std::chrono::steady_clock::now();
+
+            ExpressionEvaluator exact_profile{
                 *request_.potential_definition,
                 request_.potential_parameter_values
             };
 
-            result = solve_with_profile(
-                std::move(profile)
-            );
+            if (request_.use_lookup_table) {
+                TabulatedPeriodicProfile<
+                    ExpressionEvaluator
+                > profile{
+                    std::move(exact_profile),
+                    spatial_period,
+                    request_.lookup_intervals
+                };
+
+                const double preparation_seconds =
+                    std::chrono::duration<double>(
+                        std::chrono::steady_clock::now() -
+                        preparation_started_at
+                    ).count();
+
+                emit profile_prepared(
+                    QStringLiteral(
+                        "periodic_lookup_linear"
+                    ),
+                    static_cast<qulonglong>(
+                        profile.intervals()
+                    ),
+                    preparation_seconds
+                );
+
+                result = solve_with_profile(
+                    std::move(profile)
+                );
+            } else {
+                const double preparation_seconds =
+                    std::chrono::duration<double>(
+                        std::chrono::steady_clock::now() -
+                        preparation_started_at
+                    ).count();
+
+                emit profile_prepared(
+                    QStringLiteral("exprtk"),
+                    0,
+                    preparation_seconds
+                );
+
+                result = solve_with_profile(
+                    std::move(exact_profile)
+                );
+            }
         } else {
-            /*
-             * Старый путь сохраняется полностью.
-             *
-             * Пока MainWindow всё ещё заполняет
-             * request.v1 / request.v2, программа
-             * продолжит считать BiharmonicProfile.
-             */
             const BiharmonicProfile profile{
                 .V1 = request_.v1,
                 .V2 = request_.v2
             };
+
+            emit profile_prepared(
+                QStringLiteral("builtin"),
+                0,
+                0.0
+            );
 
             result = solve_with_profile(profile);
         }
