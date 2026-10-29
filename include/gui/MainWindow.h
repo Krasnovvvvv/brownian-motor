@@ -35,6 +35,7 @@ class SimulationWorker;
 struct SimulationRequest;
 class TrajectoryPlotWidget;
 class PotentialDropArea;
+class ModulationPanel;
 
 class MainWindow final : public QMainWindow {
 public:
@@ -131,10 +132,6 @@ private:
         PotentialState::Invalid
     };
 
-    QDoubleSpinBox* amplitude_spin_{nullptr};
-    QDoubleSpinBox* epsilon_spin_{nullptr};
-    QDoubleSpinBox* alpha_spin_{nullptr};
-
     QDoubleSpinBox* dt_spin_{nullptr};
     QDoubleSpinBox* total_time_spin_{nullptr};
     QDoubleSpinBox* x0_spin_{nullptr};
@@ -182,20 +179,7 @@ private:
 
     QThread* simulation_thread_{nullptr};
     SimulationWorker* simulation_worker_{nullptr};
-
-    QComboBox* modulation_kind_combo_{nullptr};
-
-    QDoubleSpinBox* factor_a_spin_{nullptr};
-    QDoubleSpinBox* factor_b_spin_{nullptr};
-
-    QDoubleSpinBox* gamma_a_spin_{nullptr};
-    QDoubleSpinBox* gamma_b_spin_{nullptr};
-
-    QSpinBox* dwell_a_steps_spin_{nullptr};
-    QSpinBox* dwell_b_steps_spin_{nullptr};
-
-    void update_modulation_controls_(bool is_running);
-
+    
     std::shared_ptr<std::stop_source> cancellation_source_;
 
     bool simulation_completed_{false};
@@ -205,6 +189,7 @@ private:
     QElapsedTimer elapsed_clock_;
 
     ExperimentLogger experiment_logger_;
+    ModulationPanel* modulation_panel_{nullptr};
 };
 
 #endif // BROWNIAN_MOTOR_MAINWINDOW_H

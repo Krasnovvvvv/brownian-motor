@@ -60,6 +60,9 @@ add_executable(brownian-motor
 
         include/profiles/TabulatedPeriodicProfile.h
 
+        include/gui/ModulationPanel.h
+        src/gui/ModulationPanel.cpp
+
         resources/icons.qrc
         ${app_icon_resource_windows}
 )

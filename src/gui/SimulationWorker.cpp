@@ -9,6 +9,10 @@
 #include <stdexcept>
 #include <thread>
 #include <utility>
+#include <numbers>
+
+#include "modulations/ConstantModulation.h"
+#include "modulations/SinusoidalModulation.h"
 
 #include "core/EnsembleResult.h"
 #include "core/ExpressionEvaluator.h"
@@ -147,6 +151,24 @@ void SimulationWorker::run() {
                     request_.requested_workers
                 };
 
+            const auto solve_deterministic =
+                [&](auto& modulation) -> EnsembleResult {
+                    if (request_.interactive_mode) {
+                        return solver
+                            .solve_deterministic_interactive(
+                                modulation,
+                                observer,
+                                stop_token
+                            );
+                    }
+
+                    return solver
+                        .solve_deterministic_fast(
+                            modulation,
+                            stop_token
+                        );
+                };
+
                 switch (request_.modulation.kind) {
                 case ModulationKind::LegacySymmetric: {
                     /*
@@ -241,6 +263,39 @@ void SimulationWorker::run() {
                         stop_token
                     );
                 }
+
+                    case ModulationKind::Constant: {
+                        ConstantModulation modulation{
+                            request_.modulation.constant_factor
+                        };
+
+                        return solve_deterministic(
+                            modulation
+                        );
+                    }
+
+                    case ModulationKind::Sinusoidal: {
+                        const double omega =
+                            2.0 *
+                            std::numbers::pi_v<double> /
+                            request_.modulation.sinusoidal_period;
+
+                        SinusoidalModulation modulation{
+                            request_.modulation.sinusoidal_amplitude,
+                            omega,
+                            request_.dt,
+
+                            // Initial model time.
+                            0.0,
+
+                            request_.modulation.sinusoidal_offset,
+                            request_.modulation.sinusoidal_phase
+                        };
+
+                        return solve_deterministic(
+                            modulation
+                        );
+                    }
                 }
 
                 throw std::invalid_argument(

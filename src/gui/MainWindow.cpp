@@ -53,6 +53,8 @@
 #include "core/ExpressionEvaluator.h"
 #include "core/PotentialDerivativeCheck.h"
 
+#include "gui/ModulationPanel.h"
+
 namespace {
 
 [[nodiscard]] CompactDoubleSpinBox* make_double_spin_box(
@@ -952,125 +954,33 @@ parameters_layout->addWidget(
     1
 );
 
-    auto* modulation_group =
-        new QGroupBox{"Modulation"};
+    auto* modulation_group = new QGroupBox(
+        "Modulation",
+        central_widget
+    );
+
     configure_group_title(modulation_group);
-    auto* modulation_form = new QFormLayout{
-        modulation_group
-    };
 
-    amplitude_spin_ = make_double_spin_box(
-        1.0e-8, 1'000.0, 1.0, 8, 0.1
+    auto* modulation_layout =
+        new QVBoxLayout(modulation_group);
+
+    modulation_layout->setContentsMargins(
+        8, 12, 8, 8
     );
 
-    epsilon_spin_ = make_double_spin_box(
-        1.0e-8, 1'000.0, 0.075, 8, 0.01
+    modulation_layout->setSpacing(6);
+
+    modulation_panel_ =
+        new ModulationPanel(modulation_group);
+
+    modulation_layout->addWidget(
+        modulation_panel_
     );
 
-    alpha_spin_ = make_double_spin_box(
-        -1.0, 1.0, -1.0 / 3.0, 8, 0.01
+    parameters_layout->addWidget(
+        modulation_group,
+        1
     );
-
-    modulation_form->addRow("Amplitude:", amplitude_spin_);
-    modulation_form->addRow("epsilon:", epsilon_spin_);
-    modulation_form->addRow("alpha:", alpha_spin_);
-
-    modulation_kind_combo_ =
-    new QComboBox(modulation_group);
-
-    modulation_kind_combo_->addItem(
-        "Legacy symmetric Markov",
-        static_cast<int>(
-            ModulationKind::LegacySymmetric
-        )
-    );
-
-    modulation_kind_combo_->addItem(
-        "Markov: explicit factors and rates",
-        static_cast<int>(
-            ModulationKind::MarkovTwoState
-        )
-    );
-
-    modulation_kind_combo_->addItem(
-        "Deterministic periodic switching",
-        static_cast<int>(
-            ModulationKind::PeriodicTwoState
-        )
-    );
-
-    factor_a_spin_ =
-        make_double_spin_box(
-            -1000.0, 1000.0,
-            1.0, 8, 0.1
-        );
-
-    factor_b_spin_ =
-        make_double_spin_box(
-            -1000.0, 1000.0,
-            -1.0 / 3.0, 8, 0.1
-        );
-
-    gamma_a_spin_ =
-        make_double_spin_box(
-            1.0e-8, 1.0e6,
-            0.5 / 0.075, 8, 0.1
-        );
-
-    gamma_b_spin_ =
-        make_double_spin_box(
-            1.0e-8, 1.0e6,
-            0.5 / 0.075, 8, 0.1
-        );
-
-    dwell_a_steps_spin_ =
-        make_spin_box(
-            1, 2'000'000'000,
-            150
-        );
-
-    dwell_b_steps_spin_ =
-        make_spin_box(
-            1, 2'000'000'000,
-            150
-        );
-
-    modulation_form->addRow(
-        "Process",
-        modulation_kind_combo_
-    );
-
-    modulation_form->addRow(
-        "Factor A",
-        factor_a_spin_
-    );
-
-    modulation_form->addRow(
-        "Factor B",
-        factor_b_spin_
-    );
-
-    modulation_form->addRow(
-        "Rate A -> B",
-        gamma_a_spin_
-    );
-
-    modulation_form->addRow(
-        "Rate B -> A",
-        gamma_b_spin_
-    );
-
-    modulation_form->addRow(
-        "Steps in A",
-        dwell_a_steps_spin_
-    );
-
-    modulation_form->addRow(
-        "Steps in B",
-        dwell_b_steps_spin_
-    );
-
-    parameters_layout->addWidget(modulation_group, 1);
 
     auto* simulation_group = new QGroupBox{
     "Simulation",
@@ -1478,20 +1388,6 @@ void MainWindow::connect_controls_() {
         }
     );
 
-    connect(
-        modulation_kind_combo_,
-        QOverload<int>::of(
-            &QComboBox::currentIndexChanged
-        ),
-        this,
-        [this](int) {
-           update_modulation_controls_(
-               simulation_thread_ != nullptr
-            );
-            }
-    );
-
-    update_modulation_controls_(false);
 }
 
 SimulationRequest MainWindow::request_from_controls_() const {
@@ -1518,12 +1414,6 @@ SimulationRequest MainWindow::request_from_controls_() const {
 
         .potential_parameter_values =
             potential_values_from_controls_(),
-
-        .modulation_amplitude =
-            amplitude_spin_->value(),
-
-        .epsilon = epsilon_spin_->value(),
-        .alpha = alpha_spin_->value(),
 
         .dt = dt_spin_->value(),
         .total_time = total_time_spin_->value(),
@@ -1555,30 +1445,7 @@ SimulationRequest MainWindow::request_from_controls_() const {
 
         .lookup_intervals = 16'384,
 
-        .modulation = ModulationSettings{
-            .kind =
-                static_cast<ModulationKind>(
-                    modulation_kind_combo_
-                        ->currentData()
-                        .toInt()
-                ),
-
-            .factor_a = factor_a_spin_->value(),
-            .factor_b = factor_b_spin_->value(),
-
-            .gamma_a = gamma_a_spin_->value(),
-            .gamma_b = gamma_b_spin_->value(),
-
-            .steps_a =
-                static_cast<std::size_t>(
-                    dwell_a_steps_spin_->value()
-                ),
-
-            .steps_b =
-                static_cast<std::size_t>(
-                    dwell_b_steps_spin_->value()
-                )
-        }
+        .modulation = modulation_panel_->settings()
     };
 }
 
@@ -1622,6 +1489,16 @@ bool MainWindow::validate_request_(
                     total_steps
                 )
             );
+
+        return false;
+    }
+
+    try {
+        request.modulation.validate();
+    } catch (const std::exception& exception) {
+        error_message = QString::fromUtf8(
+            exception.what()
+        );
 
         return false;
     }
@@ -2239,138 +2116,11 @@ void MainWindow::start_simulation_() {
             )
     );
 
-        QJsonObject modulation_log;
 
-    switch (request.modulation.kind) {
-    case ModulationKind::LegacySymmetric: {
-        /*
-         * Legacy mapping:
-         *   sigma_a = amplitude
-         *   sigma_b = -amplitude
-         *   sigma >= 0 -> factor = 1
-         *   sigma < 0  -> factor = alpha
-         */
-        const double factor_a =
-            request.modulation_amplitude >= 0.0
-                ? 1.0
-                : request.alpha;
-
-        const double factor_b =
-            -request.modulation_amplitude >= 0.0
-                ? 1.0
-                : request.alpha;
-
-        const double transition_rate =
-            0.5 / request.epsilon;
-
-        modulation_log = QJsonObject{
-            {
-                "modulation_kind",
-                "legacy_symmetric"
-            },
-            {
-                "amplitude",
-                request.modulation_amplitude
-            },
-            {
-                "correlation_time",
-                request.epsilon
-            },
-            {
-                "alpha",
-                request.alpha
-            },
-            {
-                "factor_a",
-                factor_a
-            },
-            {
-                "factor_b",
-                factor_b
-            },
-            {
-                "gamma_a",
-                transition_rate
-            },
-            {
-                "gamma_b",
-                transition_rate
-            }
-        };
-
-        break;
-    }
-
-    case ModulationKind::MarkovTwoState: {
-        modulation_log = QJsonObject{
-            {
-                "modulation_kind",
-                "markov_two_state"
-            },
-            {
-                "factor_a",
-                request.modulation.factor_a
-            },
-            {
-                "factor_b",
-                request.modulation.factor_b
-            },
-            {
-                "gamma_a",
-                request.modulation.gamma_a
-            },
-            {
-                "gamma_b",
-                request.modulation.gamma_b
-            }
-        };
-
-        break;
-    }
-
-    case ModulationKind::PeriodicTwoState: {
-        modulation_log = QJsonObject{
-            {
-                "modulation_kind",
-                "periodic_two_state"
-            },
-            {
-                "factor_a",
-                request.modulation.factor_a
-            },
-            {
-                "factor_b",
-                request.modulation.factor_b
-            },
-            {
-                "steps_a",
-                static_cast<qint64>(
-                    request.modulation.steps_a
-                )
-            },
-            {
-                "steps_b",
-                static_cast<qint64>(
-                    request.modulation.steps_b
-                )
-            },
-            {
-                "duration_a",
-                static_cast<double>(
-                    request.modulation.steps_a
-                ) * request.dt
-            },
-            {
-                "duration_b",
-                static_cast<double>(
-                    request.modulation.steps_b
-                ) * request.dt
-            }
-        };
-
-        break;
-    }
-    }
+    const QJsonObject modulation_log =
+        ModulationPanel::settings_json(
+            request.modulation
+        );
 
     append_log_(
         QString(
@@ -2964,9 +2714,9 @@ void MainWindow::set_running_state_(bool is_running) {
 
     mode_combo_->setEnabled(!is_running);
 
-    amplitude_spin_->setEnabled(!is_running);
-    epsilon_spin_->setEnabled(!is_running);
-    alpha_spin_->setEnabled(!is_running);
+    modulation_panel_->setEnabled(
+        !is_running
+    );
 
     dt_spin_->setEnabled(!is_running);
     total_time_spin_->setEnabled(!is_running);
@@ -2982,8 +2732,6 @@ void MainWindow::set_running_state_(bool is_running) {
     );
     update_show_graph_button_();
     update_plot_tools_();
-
-    update_modulation_controls_(is_running);
 }
 
 void MainWindow::append_log_(
@@ -3438,65 +3186,5 @@ void MainWindow::log_experiment_event_(
         }.arg(
             experiment_logger_.last_error()
         )
-    );
-}
-
-void MainWindow::update_modulation_controls_(
-    bool is_running
-) {
-    const auto kind =
-        static_cast<ModulationKind>(
-            modulation_kind_combo_
-                ->currentData()
-                .toInt()
-        );
-
-    const bool legacy =
-        kind == ModulationKind::LegacySymmetric;
-
-    const bool stochastic =
-        kind == ModulationKind::MarkovTwoState;
-
-    const bool periodic =
-        kind == ModulationKind::PeriodicTwoState;
-
-    modulation_kind_combo_->setEnabled(
-        !is_running
-    );
-
-    amplitude_spin_->setEnabled(
-        !is_running && legacy
-    );
-
-    epsilon_spin_->setEnabled(
-        !is_running && legacy
-    );
-
-    alpha_spin_->setEnabled(
-        !is_running && legacy
-    );
-
-    factor_a_spin_->setEnabled(
-        !is_running && !legacy
-    );
-
-    factor_b_spin_->setEnabled(
-        !is_running && !legacy
-    );
-
-    gamma_a_spin_->setEnabled(
-        !is_running && stochastic
-    );
-
-    gamma_b_spin_->setEnabled(
-        !is_running && stochastic
-    );
-
-    dwell_a_steps_spin_->setEnabled(
-        !is_running && periodic
-    );
-
-    dwell_b_steps_spin_->setEnabled(
-        !is_running && periodic
     );
 }
