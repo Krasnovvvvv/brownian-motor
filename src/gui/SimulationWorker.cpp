@@ -1,23 +1,31 @@
 #include "gui/SimulationWorker.h"
-#include "core/ExpressionEvaluator.h"
+
+#include <QString>
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <exception>
+#include <stdexcept>
 #include <thread>
 #include <utility>
 
 #include "core/EnsembleResult.h"
+#include "core/ExpressionEvaluator.h"
 #include "core/Potential.h"
 #include "core/SeedFactory.h"
 #include "core/SimulationObserver.h"
 #include "core/SimulationParams.h"
+
 #include "modulations/DichotomicParams.h"
 #include "modulations/ModulationFactory.h"
-#include "profiles/BiharmonicProfile.h"
-#include "solver/LangevinSolverCpu.h"
+#include "modulations/ModulationSettings.h"
+#include "modulations/PeriodicTwoStateModulation.h"
 
+#include "profiles/BiharmonicProfile.h"
 #include "profiles/TabulatedPeriodicProfile.h"
+
+#include "solver/LangevinSolverCpu.h"
 
 SimulationWorker::SimulationWorker(
     SimulationRequest request,
@@ -31,26 +39,28 @@ SimulationWorker::SimulationWorker(
 
 void SimulationWorker::run() {
     try {
+        if (!cancellation_source_) {
+            throw std::invalid_argument(
+                "Simulation cancellation source must not be null"
+            );
+        }
+
         /*
-         * Legacy BiharmonicProfile всегда periodic
-         * с period = 1.0.
+         * Built-in BiharmonicProfile:
+         *   periodic, period = 1.
          *
-         * JSON potential может быть:
-         * - periodic с любым period;
-         * - non-periodic.
+         * JSON profile:
+         *   periodic or non-periodic according to its definition.
          */
         const bool periodic_profile =
             request_.potential_definition
-                ? request_.potential_definition
-                    ->profile.periodic
+                ? request_.potential_definition->profile.periodic
                 : true;
 
         const double spatial_period =
             request_.potential_definition &&
-            request_.potential_definition
-                ->profile.periodic
-                ? request_.potential_definition
-                    ->profile.period
+            request_.potential_definition->profile.periodic
+                ? request_.potential_definition->profile.period
                 : 1.0;
 
         if (
@@ -61,8 +71,7 @@ void SimulationWorker::run() {
             )
         ) {
             throw std::invalid_argument(
-                "Lookup mode requires a periodic "
-                "JSON potential"
+                "Lookup mode requires a periodic JSON potential"
             );
         }
 
@@ -78,17 +87,8 @@ void SimulationWorker::run() {
             .periodic_profile = periodic_profile,
             .spatial_period = spatial_period,
 
-            /*
-             * Trajectory нужна только interactive path.
-             * Fast mode сохраняет прежнее условие:
-             * store_trajectory = false.
-             */
             .store_trajectory = request_.interactive_mode,
 
-            /*
-             * В interactive solver одна точка создаётся
-             * после каждого batch.
-             */
             .trajectory_stride = request_.batch_steps,
             .live_update_stride = request_.batch_steps,
             .batch_steps = request_.batch_steps,
@@ -98,81 +98,160 @@ void SimulationWorker::run() {
         };
 
         simulation_params.validate();
+        request_.modulation.validate();
 
         const SeedFactory seeds{
             request_.seed
         };
 
-        const DichotomicParams modulation_params =
-            DichotomicParams::symmetric(
-                request_.modulation_amplitude,
-                request_.epsilon,
-                request_.dt,
-                request_.alpha
-            );
-
-        auto modulations =
-            ModulationFactory::make_dichotomic_ensemble(
-                modulation_params,
-                request_.n_particles,
-                seeds
-            );
+        const auto stop_token =
+            cancellation_source_->get_token();
 
         /*
-         * Один generic path для обоих Profile types:
-         *
-         * BiharmonicProfile
-         * ExpressionEvaluator
-         *
-         * LangevinSolverCpu создаётся отдельно под
-         * фактический concrete Profile type.
+         * One observer is shared by all modulation/profile paths.
+         * It is passed to the solver only in interactive mode.
+         */
+        const SimulationObserver observer =
+            [this](
+                const SimulationUpdate& update
+            ) {
+                emit progress_updated(
+                    static_cast<qulonglong>(
+                        update.step + 1
+                    ),
+                    static_cast<qulonglong>(
+                        update.total_steps
+                    ),
+                    update.time,
+                    update.mean_x,
+                    update.mean_velocity
+                );
+            };
+
+        /*
+         * Instantiate the solver for the selected profile type,
+         * then dispatch to the selected modulation process.
          */
         const auto solve_with_profile =
             [&]<typename Profile>(
                 Profile profile
             ) -> EnsembleResult {
-                const Potential<Profile> potential{
+                Potential<Profile> potential{
                     std::move(profile)
                 };
 
                 LangevinSolverCpu<Profile> solver{
-                    potential,
+                    std::move(potential),
                     simulation_params,
                     seeds,
                     request_.requested_workers
                 };
 
-                if (request_.interactive_mode) {
-                    const SimulationObserver observer =
-                        [this](
-                            const SimulationUpdate& update
-                        ) {
-                            emit progress_updated(
-                                static_cast<qulonglong>(
-                                    update.step + 1
-                                ),
-                                static_cast<qulonglong>(
-                                    update.total_steps
-                                ),
-                                update.time,
-                                update.mean_x,
-                                update.mean_velocity
-                            );
-                        };
+                switch (request_.modulation.kind) {
+                case ModulationKind::LegacySymmetric: {
+                    /*
+                     * Preserve the existing parameter mapping:
+                     * amplitude, epsilon (= correlation time), alpha.
+                     */
+                    const DichotomicParams modulation_params =
+                        DichotomicParams::symmetric(
+                            request_.modulation_amplitude,
+                            request_.epsilon,
+                            request_.dt,
+                            request_.alpha
+                        );
 
-                    return solver.solve_stochastic_interactive(
+                    auto modulations =
+                        ModulationFactory::
+                            make_dichotomic_ensemble(
+                                modulation_params,
+                                request_.n_particles,
+                                seeds
+                            );
+
+                    if (request_.interactive_mode) {
+                        return solver
+                            .solve_stochastic_interactive(
+                                modulations,
+                                observer,
+                                stop_token
+                            );
+                    }
+
+                    return solver.solve_stochastic_fast(
                         modulations,
-                        observer,
-                        cancellation_source_->get_token()
+                        stop_token
                     );
                 }
 
-                return solver.solve_stochastic_fast(
-                    modulations,
-                    cancellation_source_->get_token()
+                case ModulationKind::MarkovTwoState: {
+                    /*
+                     * Explicit potential factors and independent
+                     * transition rates A -> B and B -> A.
+                     *
+                     * Each particle receives its own process.
+                     */
+                    auto modulations =
+                        ModulationFactory::
+                            make_two_state_factor_ensemble(
+                                request_.modulation,
+                                request_.dt,
+                                request_.n_particles,
+                                seeds
+                            );
+
+                    if (request_.interactive_mode) {
+                        return solver
+                            .solve_stochastic_interactive(
+                                modulations,
+                                observer,
+                                stop_token
+                            );
+                    }
+
+                    return solver.solve_stochastic_fast(
+                        modulations,
+                        stop_token
+                    );
+                }
+
+                case ModulationKind::PeriodicTwoState: {
+                    /*
+                     * One deterministic switching schedule
+                     * is used for the entire ensemble.
+                     *
+                     * The deterministic solver prepares the
+                     * factors before launching worker threads.
+                     */
+                    PeriodicTwoStateModulation modulation{
+                        request_.modulation
+                    };
+
+                    if (request_.interactive_mode) {
+                        return solver
+                            .solve_deterministic_interactive(
+                                modulation,
+                                observer,
+                                stop_token
+                            );
+                    }
+
+                    return solver.solve_deterministic_fast(
+                        modulation,
+                        stop_token
+                    );
+                }
+                }
+
+                throw std::invalid_argument(
+                    "Unknown modulation kind"
                 );
             };
 
+        /*
+         * Total measured time includes profile preparation,
+         * modulation preparation and the solver execution.
+         */
         const auto started_at =
             std::chrono::steady_clock::now();
 

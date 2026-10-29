@@ -183,6 +183,19 @@ private:
     QThread* simulation_thread_{nullptr};
     SimulationWorker* simulation_worker_{nullptr};
 
+    QComboBox* modulation_kind_combo_{nullptr};
+
+    QDoubleSpinBox* factor_a_spin_{nullptr};
+    QDoubleSpinBox* factor_b_spin_{nullptr};
+
+    QDoubleSpinBox* gamma_a_spin_{nullptr};
+    QDoubleSpinBox* gamma_b_spin_{nullptr};
+
+    QSpinBox* dwell_a_steps_spin_{nullptr};
+    QSpinBox* dwell_b_steps_spin_{nullptr};
+
+    void update_modulation_controls_(bool is_running);
+
     std::shared_ptr<std::stop_source> cancellation_source_;
 
     bool simulation_completed_{false};

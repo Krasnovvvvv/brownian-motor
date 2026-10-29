@@ -3,6 +3,7 @@
 #pragma once
 
 #include "core/PotentialDefinition.h"
+#include "modulations/ModulationSettings.h"
 
 #include <QObject>
 #include <QtGlobal>
@@ -57,6 +58,8 @@ struct SimulationRequest final {
     bool use_lookup_table{false};
 
     std::size_t lookup_intervals{16'384};
+
+    ModulationSettings modulation;
 };
 
 class SimulationWorker final : public QObject {

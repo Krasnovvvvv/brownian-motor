@@ -138,6 +138,38 @@ public:
     }
 
     template <ModulationProcess Modulation>
+    [[nodiscard]]
+    EnsembleResult solve_deterministic_interactive(
+        Modulation& modulation,
+        const SimulationObserver& observer = {},
+        std::stop_token stop_token = {}
+    ) const {
+        const std::size_t total_steps =
+            params_.step_count();
+
+        std::vector<double> factors(total_steps);
+
+        for (
+            std::size_t step = 0;
+            step < total_steps;
+            ++step
+        ) {
+            factors[step] = modulation.step();
+        }
+
+        return solve_interactive_(
+            [&factors](
+                std::size_t,
+                std::size_t step
+            ) noexcept {
+                return factors[step];
+            },
+            observer,
+            stop_token
+        );
+    }
+
+    template <ModulationProcess Modulation>
     [[nodiscard]] EnsembleResult solve_stochastic(
         std::vector<Modulation>& modulations,
         std::stop_token stop_token = {}
