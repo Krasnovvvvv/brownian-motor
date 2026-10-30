@@ -30,6 +30,7 @@ class QScrollArea;
 class QSpinBox;
 class QString;
 class QThread;
+class QGroupBox;
 
 class SimulationWorker;
 struct SimulationRequest;
@@ -190,6 +191,7 @@ private:
 
     ExperimentLogger experiment_logger_;
     ModulationPanel* modulation_panel_{nullptr};
+    QGroupBox* simulation_group_{nullptr};
 };
 
 #endif // BROWNIAN_MOTOR_MAINWINDOW_H

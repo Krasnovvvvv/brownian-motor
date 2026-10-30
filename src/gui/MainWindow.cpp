@@ -1,6 +1,7 @@
 #include "gui/MainWindow.h"
 
 #include <Qt>
+#include <QtGlobal>
 #include <QComboBox>
 #include <QCheckBox>
 #include <QDoubleSpinBox>
@@ -37,6 +38,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -56,6 +58,79 @@
 #include "gui/ModulationPanel.h"
 
 namespace {
+
+    [[nodiscard]] QString format_elapsed_time(
+    qint64 milliseconds
+) {
+        if (milliseconds < 0) {
+            return QStringLiteral("--");
+        }
+
+        constexpr qint64 milliseconds_per_second = 1000;
+        constexpr qint64 milliseconds_per_minute = 60'000;
+        constexpr qint64 milliseconds_per_hour = 3'600'000;
+
+        const qint64 hours =
+            milliseconds / milliseconds_per_hour;
+
+        const qint64 minutes =
+            (milliseconds / milliseconds_per_minute) % 60;
+
+        const qint64 seconds =
+            (milliseconds / milliseconds_per_second) % 60;
+
+        const qint64 remainder =
+            milliseconds % milliseconds_per_second;
+
+        const QString seconds_text =
+            QStringLiteral("%1.%2 s")
+                .arg(seconds)
+                .arg(
+                    remainder,
+                    3,
+                    10,
+                    QLatin1Char('0')
+                );
+
+        if (hours > 0) {
+            return QStringLiteral("%1 h %2 m %3")
+                .arg(hours)
+                .arg(minutes)
+                .arg(seconds_text);
+        }
+
+        if (minutes > 0) {
+            return QStringLiteral("%1 m %2")
+                .arg(minutes)
+                .arg(seconds_text);
+        }
+
+        return seconds_text;
+    }
+
+    [[nodiscard]] QString format_elapsed_seconds(
+        double seconds
+    ) {
+        const double milliseconds =
+            seconds * 1000.0;
+
+        if (
+            !std::isfinite(milliseconds) ||
+            milliseconds < 0.0 ||
+            milliseconds >=
+                static_cast<double>(
+                    std::numeric_limits<qint64>::max()
+                )
+        ) {
+            return QStringLiteral("--");
+        }
+
+        return format_elapsed_time(
+            static_cast<qint64>(
+                std::llround(milliseconds)
+            )
+        );
+    }
 
 [[nodiscard]] CompactDoubleSpinBox* make_double_spin_box(
     double minimum,
@@ -982,10 +1057,18 @@ parameters_layout->addWidget(
         1
     );
 
-    auto* simulation_group = new QGroupBox{
-    "Simulation",
-    central_widget
-};
+    simulation_group_ = new QGroupBox(
+        "Simulation",
+        central_widget
+    );
+
+    // Сохраняем прежнее локальное имя для остального кода.
+    auto* simulation_group =
+        simulation_group_;
+
+    simulation_group_->installEventFilter(
+        this
+    );
     configure_group_title(simulation_group);
 auto* simulation_group_layout = new QVBoxLayout{
     simulation_group
@@ -1229,7 +1312,7 @@ parameters_layout->addWidget(
     progress_bar_->setVisible(false);
 
     elapsed_live_label_ = new QLabel{"Elapsed: —"};
-    elapsed_live_label_->setMinimumWidth(140);
+    elapsed_live_label_->setMinimumWidth(220);
 
     cancel_button_->setEnabled(false);
 
@@ -1237,18 +1320,47 @@ parameters_layout->addWidget(
     status_label_->setFrameStyle(
         QFrame::Panel | QFrame::Sunken
     );
-    status_label_->setMinimumWidth(330);
+    status_label_->setWordWrap(false);
 
-    controls_layout->addWidget(run_button_);
-    controls_layout->addWidget(cancel_button_);
-    controls_layout->addWidget(show_graph_button_);
-    controls_layout->addWidget(progress_bar_);
-    controls_layout->addWidget(elapsed_live_label_);
-    controls_layout->addSpacing(12);
-    controls_layout->addWidget(status_label_);
-    controls_layout->addStretch();
+    status_label_->setAlignment(
+        Qt::AlignLeft |
+        Qt::AlignVCenter
+    );
 
-    root_layout->addLayout(controls_layout);
+    controls_layout->setContentsMargins(
+        0, 0, 0, 0
+    );
+
+    controls_layout->addWidget(
+        run_button_
+    );
+
+    controls_layout->addWidget(
+        cancel_button_
+    );
+
+    controls_layout->addWidget(
+        show_graph_button_
+    );
+
+    controls_layout->addWidget(
+        progress_bar_
+    );
+
+    controls_layout->addWidget(
+        elapsed_live_label_
+    );
+
+    // Всё свободное место — перед статусом.
+    controls_layout->addStretch(1);
+
+    controls_layout->addWidget(
+        status_label_
+    );
+
+    root_layout->addLayout(
+        controls_layout
+    );
 
     auto* results_group = new QGroupBox{"Result"};
     auto* results_layout = new QGridLayout{results_group};
@@ -1296,15 +1408,90 @@ parameters_layout->addWidget(
 
     root_layout->addWidget(results_group);
 
-    auto* log_group = new QGroupBox{"Log"};
-    auto* log_layout = new QVBoxLayout{log_group};
+    auto* log_group = new QGroupBox(
+    "Log",
+    central_widget
+);
 
-    log_output_ = new QPlainTextEdit;
+    auto* log_layout =
+        new QVBoxLayout(log_group);
+
+    log_layout->setContentsMargins(
+        8, 12, 8, 8
+    );
+
+    log_layout->setSpacing(4);
+
+    log_output_ = new QPlainTextEdit(
+        log_group
+    );
+
     log_output_->setReadOnly(true);
-    log_output_->setMaximumBlockCount(1'000);
+    log_output_->setMaximumBlockCount(1000);
 
-    log_layout->addWidget(log_output_);
-    root_layout->addWidget(log_group, 1);
+    // Текстовое окно занимает свободное пространство.
+    log_layout->addWidget(
+        log_output_,
+        1
+    );
+
+    // Нижняя строка с кнопкой справа.
+    auto* log_toolbar = new QHBoxLayout;
+
+    log_toolbar->setContentsMargins(
+        0, 0, 0, 0
+    );
+
+    log_toolbar->addStretch(1);
+
+    auto* clear_log_button = new QPushButton(
+        "Clear",
+        log_group
+    );
+
+    clear_log_button->setToolTip(
+        "Clear the visible log. "
+        "The experiment log file is not modified."
+    );
+
+    clear_log_button->setAutoDefault(false);
+    clear_log_button->setDefault(false);
+
+    log_toolbar->addWidget(
+        clear_log_button
+    );
+
+    log_layout->addLayout(
+        log_toolbar
+    );
+
+    connect(
+        clear_log_button,
+        &QPushButton::clicked,
+        log_output_,
+        &QPlainTextEdit::clear
+    );
+
+    root_layout->addWidget(
+        log_group,
+        1
+    );
+
+
+    QTimer::singleShot(
+    0,
+    this,
+    [this] {
+        if (
+            simulation_group_ &&
+            status_label_
+        ) {
+            status_label_->setFixedWidth(
+                simulation_group_->width()
+            );
+        }
+    }
+);
 }
 
 void MainWindow::connect_controls_() {
@@ -1508,18 +1695,20 @@ bool MainWindow::validate_request_(
 
 void MainWindow::update_elapsed_time_() {
     if (!elapsed_clock_.isValid()) {
-        elapsed_live_label_->setText("Elapsed: —");
+        elapsed_live_label_->setText(
+            "Elapsed: --"
+        );
+
         return;
     }
 
-    const double elapsed_seconds =
-        static_cast<double>(
-            elapsed_clock_.elapsed()
-        ) / 1000.0;
-
     elapsed_live_label_->setText(
-        QString{"Elapsed: %1 s"}
-            .arg(elapsed_seconds, 0, 'f', 1)
+        QStringLiteral("Elapsed: %1")
+            .arg(
+                format_elapsed_time(
+                    elapsed_clock_.elapsed()
+                )
+            )
     );
 }
 
@@ -1939,13 +2128,16 @@ void MainWindow::start_simulation_() {
             );
 
             status_label_->setText(
-                QString{
-                    "Running: %1% | t = %2 | <x> = %3 | v = %4"
-                }
+                QString(
+                    "Running: %1% | t = %2"
+                )
                     .arg(progress_percent)
-                    .arg(time, 0, 'g', 8)
-                    .arg(mean_x, 0, 'e', 4)
-                    .arg(mean_velocity, 0, 'e', 4)
+                    .arg(
+                        time,
+                        0,
+                        'g',
+                        6
+                    )
             );
 
             trajectory_plot_->append_point(
@@ -1969,9 +2161,18 @@ void MainWindow::start_simulation_() {
         ) {
             elapsed_timer_.stop();
 
+            const QString elapsed_text =
+                format_elapsed_seconds(
+                    elapsed_seconds
+                );
+
             elapsed_live_label_->setText(
-                QString{"Elapsed: %1 s"}
-                    .arg(elapsed_seconds, 0, 'f', 3)
+                QStringLiteral("Elapsed: %1")
+                    .arg(elapsed_text)
+            );
+
+            elapsed_value_label_->setText(
+                elapsed_text
             );
 
             progress_bar_->setRange(0, 100);
@@ -1994,11 +2195,6 @@ void MainWindow::start_simulation_() {
                 )
             );
 
-            elapsed_value_label_->setText(
-                QString{"%1 s"}
-                    .arg(elapsed_seconds, 0, 'f', 3)
-            );
-
             throughput_value_label_->setText(
                 QString{"%1 M updates/s"}
                     .arg(throughput, 0, 'f', 3)
@@ -2019,21 +2215,39 @@ void MainWindow::start_simulation_() {
 
             status_label_->setText(
                 was_cancelled
-                    ? "Cancelled: partial result returned"
+                    ? "Cancelled (partial result)"
                     : "Completed"
             );
 
             append_log_(
-                QString{
-                    "Completed: velocity = %1, "
-                    "<x_final> = %2, time = %3 s, "
-                    "throughput = %4 M updates/s"
-                }
-                    .arg(mean_velocity, 0, 'e', 12)
-                    .arg(mean_x_final, 0, 'e', 12)
-                    .arg(elapsed_seconds, 0, 'f', 3)
-                    .arg(throughput, 0, 'f', 3)
-            );
+    QString(
+        "Completed: velocity = %1, "
+        "<x_final> = %2, "
+        "time = %3, "
+        "throughput = %4 M updates/s"
+    )
+        .arg(
+            mean_velocity,
+            0,
+            'e',
+            12
+        )
+        .arg(
+            mean_x_final,
+            0,
+            'e',
+            12
+        )
+        .arg(
+            elapsed_text
+        )
+        .arg(
+            throughput,
+            0,
+            'f',
+            3
+        )
+);
 
             log_experiment_event_(
     was_cancelled
@@ -2409,7 +2623,7 @@ void MainWindow::start_simulation_() {
 
     progress_bar_->setVisible(true);
 
-    elapsed_live_label_->setText("Elapsed: 0.0 s");
+    elapsed_live_label_->setText("Elapsed: 0.000 s");
     elapsed_clock_.start();
     elapsed_timer_.start();
 
@@ -2860,6 +3074,17 @@ bool MainWindow::eventFilter(
     QObject* watched,
     QEvent* event
 ) {
+
+    if (
+    watched == simulation_group_ &&
+    event->type() == QEvent::Resize &&
+    status_label_
+) {
+        status_label_->setFixedWidth(
+            simulation_group_->width()
+        );
+}
+
     if (
         watched == trajectory_dialog_ &&
         (
