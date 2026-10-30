@@ -34,5 +34,11 @@ private:
     QDoubleSpinBox* sine_amplitude_{};
     QDoubleSpinBox* sine_period_{};
     QDoubleSpinBox* sine_phase_{};
+    
+    QDoubleSpinBox* rectangular_factor_a_{};
+    QDoubleSpinBox* rectangular_factor_b_{};
+
+    QDoubleSpinBox* rectangular_duration_a_{};
+    QDoubleSpinBox* rectangular_duration_b_{};
 };
 #endif

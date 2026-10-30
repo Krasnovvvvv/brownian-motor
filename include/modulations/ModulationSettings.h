@@ -12,7 +12,8 @@ enum class ModulationKind {
     MarkovTwoState = 1,
     PeriodicTwoState = 2,
     Constant = 3,
-    Sinusoidal = 4
+    Sinusoidal = 4,
+    RectangularPeriodic = 5
 };
 
 struct ModulationSettings final {
@@ -23,6 +24,9 @@ struct ModulationSettings final {
     double gamma_b{1.0};
     std::size_t steps_a{150};
     std::size_t steps_b{150};
+
+    double rectangular_duration_a{0.15};
+    double rectangular_duration_b{0.15};
 
     double constant_factor{1.0};
     double sinusoidal_offset{0.0};
@@ -67,6 +71,27 @@ struct ModulationSettings final {
                 throw std::invalid_argument("Invalid sinusoidal modulation parameters");
             }
             return;
+
+            case ModulationKind::RectangularPeriodic:
+                validate_factors_();
+
+                if (
+                    !std::isfinite(rectangular_duration_a) ||
+                    !std::isfinite(rectangular_duration_b) ||
+                    rectangular_duration_a <= 0.0 ||
+                    rectangular_duration_b <= 0.0 ||
+                    !std::isfinite(
+                        rectangular_duration_a +
+                        rectangular_duration_b
+                    )
+                ) {
+                    throw std::invalid_argument(
+                        "Rectangular durations and their sum "
+                        "must be finite and positive"
+                    );
+                }
+
+                return;
         }
         throw std::invalid_argument("Unknown modulation kind");
     }

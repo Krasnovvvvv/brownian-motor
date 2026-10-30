@@ -51,6 +51,12 @@ ModulationPanel::ModulationPanel(QWidget* parent) : QWidget(parent) {
     deterministic_kind_ = new QComboBox(deterministic_selector_);
     deterministic_kind_->addItem("Constant", static_cast<int>(ModulationKind::Constant));
     deterministic_kind_->addItem("Sinusoidal", static_cast<int>(ModulationKind::Sinusoidal));
+    deterministic_kind_->addItem(
+    "Rectangular switching",
+        static_cast<int>(
+            ModulationKind::RectangularPeriodic
+        )
+    );
     selector_form->addRow("Profile", deterministic_kind_);
     root->addWidget(deterministic_selector_);
 
@@ -102,6 +108,96 @@ ModulationPanel::ModulationPanel(QWidget* parent) : QWidget(parent) {
     sine_form->addRow(equation);
     pages_->addWidget(sine_page);
 
+    auto* rectangular_page =
+    new QWidget(pages_);
+
+    auto* rectangular_form =
+        form(rectangular_page);
+
+    rectangular_factor_a_ =
+        spin(
+            rectangular_page,
+            -1000.0,
+            1000.0,
+            1.0,
+            8,
+            0.1
+        );
+
+    rectangular_factor_b_ =
+        spin(
+            rectangular_page,
+            -1000.0,
+            1000.0,
+            -1.0 / 3.0,
+            8,
+            0.1
+        );
+
+    rectangular_duration_a_ =
+        spin(
+            rectangular_page,
+            1.0e-8,
+            1.0e6,
+            0.15,
+            8,
+            0.01
+        );
+
+    rectangular_duration_b_ =
+        spin(
+            rectangular_page,
+            1.0e-8,
+            1.0e6,
+            0.15,
+            8,
+            0.01
+        );
+
+    rectangular_duration_a_->setToolTip(
+        "Fixed duration of state A in model time. "
+        "Not a mean stochastic lifetime."
+    );
+
+    rectangular_duration_b_->setToolTip(
+        "Fixed duration of state B in model time. "
+        "Not a mean stochastic lifetime."
+    );
+
+    rectangular_form->addRow(
+        "Factor A",
+        rectangular_factor_a_
+    );
+
+    rectangular_form->addRow(
+        "Factor B",
+        rectangular_factor_b_
+    );
+
+    rectangular_form->addRow(
+        "Duration A",
+        rectangular_duration_a_
+    );
+
+    rectangular_form->addRow(
+        "Duration B",
+        rectangular_duration_b_
+    );
+
+    auto* rectangular_info = new QLabel(
+        "Fixed periodic switching: A -> B -> A. "
+        "Starts in A. Durations use model time.",
+        rectangular_page
+    );
+
+    rectangular_info->setWordWrap(true);
+
+    rectangular_form->addRow(
+        rectangular_info
+    );
+
+    pages_->addWidget(rectangular_page);
+
     connect(category_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [this](int) { update_pages_(); });
     connect(deterministic_kind_, QOverload<int>::of(&QComboBox::currentIndexChanged),
@@ -115,13 +211,41 @@ ModulationPanel::ModulationPanel(QWidget* parent) : QWidget(parent) {
 }
 
 void ModulationPanel::update_pages_() {
-    const bool deterministic = category_->currentIndex() == 1;
-    deterministic_selector_->setVisible(deterministic);
+    const bool deterministic =
+        category_->currentIndex() == 1;
+
+    deterministic_selector_->setVisible(
+        deterministic
+    );
+
     if (!deterministic) {
         pages_->setCurrentIndex(0);
-    } else {
-        const auto kind = static_cast<ModulationKind>(deterministic_kind_->currentData().toInt());
-        pages_->setCurrentIndex(kind == ModulationKind::Constant ? 1 : 2);
+        return;
+    }
+
+    const auto kind =
+        static_cast<ModulationKind>(
+            deterministic_kind_
+                ->currentData()
+                .toInt()
+        );
+
+    switch (kind) {
+        case ModulationKind::Constant:
+            pages_->setCurrentIndex(1);
+            break;
+
+        case ModulationKind::Sinusoidal:
+            pages_->setCurrentIndex(2);
+            break;
+
+        case ModulationKind::RectangularPeriodic:
+            pages_->setCurrentIndex(3);
+            break;
+
+        default:
+            pages_->setCurrentIndex(1);
+            break;
     }
 }
 
@@ -139,24 +263,75 @@ void ModulationPanel::update_noise_summary_() {
 
 ModulationSettings ModulationPanel::settings() const {
     ModulationSettings result;
+
     if (category_->currentIndex() == 0) {
-        result.kind = ModulationKind::MarkovTwoState;
-        result.factor_a = factor_a_->value();
-        result.factor_b = factor_b_->value();
-        result.gamma_a = 1.0 / lifetime_a_->value();
-        result.gamma_b = 1.0 / lifetime_b_->value();
+        result.kind =
+            ModulationKind::MarkovTwoState;
+
+        result.factor_a =
+            factor_a_->value();
+
+        result.factor_b =
+            factor_b_->value();
+
+        result.gamma_a =
+            1.0 / lifetime_a_->value();
+
+        result.gamma_b =
+            1.0 / lifetime_b_->value();
     } else {
-        result.kind = static_cast<ModulationKind>(deterministic_kind_->currentData().toInt());
-        if (result.kind == ModulationKind::Constant) {
-            result.constant_factor = constant_factor_->value();
-        } else {
-            result.sinusoidal_offset = sine_offset_->value();
-            result.sinusoidal_amplitude = sine_amplitude_->value();
-            result.sinusoidal_period = sine_period_->value();
-            result.sinusoidal_phase = sine_phase_->value() * std::numbers::pi_v<double> / 180.0;
+        result.kind =
+            static_cast<ModulationKind>(
+                deterministic_kind_
+                    ->currentData()
+                    .toInt()
+            );
+
+        switch (result.kind) {
+            case ModulationKind::Constant:
+                result.constant_factor =
+                    constant_factor_->value();
+                break;
+
+            case ModulationKind::Sinusoidal:
+                result.sinusoidal_offset =
+                    sine_offset_->value();
+
+                result.sinusoidal_amplitude =
+                    sine_amplitude_->value();
+
+                result.sinusoidal_period =
+                    sine_period_->value();
+
+                result.sinusoidal_phase =
+                    sine_phase_->value() *
+                    std::numbers::pi_v<double> /
+                    180.0;
+                break;
+
+            case ModulationKind::RectangularPeriodic:
+                result.factor_a =
+                    rectangular_factor_a_->value();
+
+                result.factor_b =
+                    rectangular_factor_b_->value();
+
+                result.rectangular_duration_a =
+                    rectangular_duration_a_->value();
+
+                result.rectangular_duration_b =
+                    rectangular_duration_b_->value();
+                break;
+
+            default:
+                throw std::invalid_argument(
+                    "Unsupported deterministic modulation"
+                );
         }
     }
+
     result.validate();
+
     return result;
 }
 
@@ -182,6 +357,47 @@ QJsonObject ModulationPanel::settings_json(const ModulationSettings& s) {
             {"omega", 2.0 * std::numbers::pi_v<double> / s.sinusoidal_period},
             {"phase_radians", s.sinusoidal_phase}, {"initial_time", 0.0}
         };
+
+        case ModulationKind::RectangularPeriodic:
+            return {
+            {
+                "mode",
+                "deterministic"
+            },
+            {
+                "modulation_kind",
+                "rectangular_periodic"
+            },
+            {
+                "factor_a",
+                s.factor_a
+            },
+            {
+                "factor_b",
+                s.factor_b
+            },
+            {
+                "duration_a",
+                s.rectangular_duration_a
+            },
+            {
+                "duration_b",
+                s.rectangular_duration_b
+            },
+            {
+                "period",
+                s.rectangular_duration_a +
+                s.rectangular_duration_b
+            },
+            {
+                "initial_state",
+                "A"
+            },
+            {
+                "scope",
+                "common_for_ensemble"
+            }
+            };
     default:
         throw std::invalid_argument("This panel does not expose legacy modulation kinds");
     }

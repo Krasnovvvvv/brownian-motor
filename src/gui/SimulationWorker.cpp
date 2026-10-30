@@ -25,6 +25,7 @@
 #include "modulations/ModulationFactory.h"
 #include "modulations/ModulationSettings.h"
 #include "modulations/PeriodicTwoStateModulation.h"
+#include "modulations/RectangularModulation.h"
 
 #include "profiles/BiharmonicProfile.h"
 #include "profiles/TabulatedPeriodicProfile.h"
@@ -264,7 +265,7 @@ void SimulationWorker::run() {
                     );
                 }
 
-                    case ModulationKind::Constant: {
+                case ModulationKind::Constant: {
                         ConstantModulation modulation{
                             request_.modulation.constant_factor
                         };
@@ -274,7 +275,7 @@ void SimulationWorker::run() {
                         );
                     }
 
-                    case ModulationKind::Sinusoidal: {
+                case ModulationKind::Sinusoidal: {
                         const double omega =
                             2.0 *
                             std::numbers::pi_v<double> /
@@ -290,6 +291,17 @@ void SimulationWorker::run() {
 
                             request_.modulation.sinusoidal_offset,
                             request_.modulation.sinusoidal_phase
+                        };
+
+                        return solve_deterministic(
+                            modulation
+                        );
+                    }
+
+                    case ModulationKind::RectangularPeriodic: {
+                        RectangularModulation modulation{
+                            request_.modulation,
+                            request_.dt
                         };
 
                         return solve_deterministic(

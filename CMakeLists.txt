@@ -63,6 +63,8 @@ add_executable(brownian-motor
         include/gui/ModulationPanel.h
         src/gui/ModulationPanel.cpp
 
+        include/modulations/RectangularModulation.h
+
         resources/icons.qrc
         ${app_icon_resource_windows}
 )
