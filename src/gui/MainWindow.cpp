@@ -1779,6 +1779,73 @@ void MainWindow::start_simulation_() {
                         0, 'e', 8
                     )
             );
+
+            if (
+                statistics
+                    .value("control_variate_available")
+                    .toBool()
+            ) {
+                const double cv_velocity =
+                    statistics
+                        .value("control_variate_velocity")
+                        .toDouble();
+
+                const double cv_error =
+                    statistics
+                        .value(
+                            "control_variate_standard_error"
+                        )
+                        .toDouble();
+
+                const double cv_lower =
+                    statistics
+                        .value("control_variate_ci95_lower")
+                        .toDouble();
+
+                const double cv_upper =
+                    statistics
+                        .value("control_variate_ci95_upper")
+                        .toDouble();
+
+                const bool cv_contains_zero =
+                    statistics
+                        .value(
+                            "control_variate_ci95_contains_zero"
+                        )
+                        .toBool();
+
+                append_log_(
+                    QString(
+                        "Control-variate velocity: "
+                        "v = %1; SE = %2; "
+                        "approx. 95% CI = [%3, %4]; "
+                        "zero in CI = %5"
+                    )
+                        .arg(cv_velocity, 0, 'e', 8)
+                        .arg(cv_error, 0, 'e', 8)
+                        .arg(cv_lower, 0, 'e', 8)
+                        .arg(cv_upper, 0, 'e', 8)
+                        .arg(
+                            cv_contains_zero
+                                ? QStringLiteral("yes")
+                                : QStringLiteral("no")
+                        )
+                );
+
+                append_log_(
+                    QString(
+                        "Thermal sample contribution "
+                        "to raw velocity: %1"
+                    ).arg(
+                        statistics
+                            .value("mean_thermal_velocity")
+                            .toDouble(),
+                        0,
+                        'e',
+                        8
+                    )
+                );
+            }
         },
         Qt::QueuedConnection
     );

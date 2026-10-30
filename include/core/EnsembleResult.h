@@ -54,6 +54,38 @@ struct EnsembleResult final {
         std::numeric_limits<double>::quiet_NaN()
     };
 
+    /*
+ * Fixed-coefficient control-variate estimate.
+ * The control is free diffusion driven by the same
+ * thermal increments over the measurement interval.
+ */
+    bool has_control_variate_statistics{false};
+
+    double control_variate_velocity{
+        std::numeric_limits<double>::quiet_NaN()
+    };
+
+    double control_variate_standard_error{
+        std::numeric_limits<double>::quiet_NaN()
+    };
+
+    double control_variate_ci95_lower{
+        std::numeric_limits<double>::quiet_NaN()
+    };
+
+    double control_variate_ci95_upper{
+        std::numeric_limits<double>::quiet_NaN()
+    };
+
+    double integrated_drift_variance{
+        std::numeric_limits<double>::quiet_NaN()
+    };
+
+    // Raw velocity minus control-variate velocity.
+    double mean_thermal_velocity{
+        std::numeric_limits<double>::quiet_NaN()
+    };
+
 };
 
 #endif // BROWNIAN_MOTOR_ENSEMBLERESULT_H

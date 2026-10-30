@@ -199,6 +199,7 @@ private:
         std::vector<double> x_unwrapped;
         std::vector<double> x_wrapped;
         std::vector<double> x_at_burn_in;
+        std::vector<double> integrated_drift;
 
         std::vector<std::mt19937> gaussian_rngs;
 
@@ -302,6 +303,11 @@ private:
         );
 
         state.gaussian_rngs.reserve(params_.n_particles);
+
+        state.integrated_drift.assign(
+            params_.n_particles,
+            0.0
+        );
 
         for (std::size_t particle = 0;
              particle < params_.n_particles;
@@ -411,6 +417,8 @@ private:
                                 ];
 
                         double& x_at_burn_in = state.x_at_burn_in[particle];
+                        double local_integrated_drift =
+                            state.integrated_drift[particle];
 
                         for (std::size_t step = 0;
                              step < total_steps;
@@ -442,6 +450,7 @@ private:
                                     gaussian_rng,
                                     gaussian_distribution,
                                     factor,
+                                    local_integrated_drift,
                                     failure_reason
                                 )
                             ) {
@@ -458,8 +467,12 @@ private:
 
                             if (step + 1 == burn_in_steps) {
                                 x_at_burn_in = x_unwrapped;
+                                local_integrated_drift = 0.0;
                             }
                         }
+
+                        state.integrated_drift[particle] =
+                            local_integrated_drift;
 
                         if (numerical_failures[worker]) {
                             break;
@@ -653,6 +666,8 @@ private:
                                     ];
 
                             double& x_at_burn_in = state.x_at_burn_in[particle];
+                            double local_integrated_drift =
+                                state.integrated_drift[particle];
 
                             for (std::size_t step = batch_begin;
                                  step < batch_end;
@@ -688,6 +703,7 @@ private:
                                         gaussian_rng,
                                         gaussian_distribution,
                                         factor,
+                                        local_integrated_drift,
                                         failure_reason
                                     )
                                 ) {
@@ -704,8 +720,12 @@ private:
 
                                 if (step + 1 == burn_in_steps) {
                                     x_at_burn_in = x_unwrapped;
+                                    local_integrated_drift = 0.0;
                                 }
                             }
+
+                            state.integrated_drift[particle] =
+                                local_integrated_drift;
 
                             if (numerical_failures[worker]) {
                                 break;
@@ -829,6 +849,7 @@ private:
 
         if (
             state.x_at_burn_in.size() != count ||
+            state.integrated_drift.size() != count ||
             count != params_.n_particles
         ) {
             throw std::runtime_error(
@@ -860,6 +881,9 @@ private:
         double mean = 0.0;
         double m2 = 0.0;
 
+        double drift_mean = 0.0;
+        double drift_m2 = 0.0;
+
         for (
             std::size_t particle = 0;
             particle < count;
@@ -888,6 +912,29 @@ private:
                 displacement - mean;
 
             m2 += delta * delta_after_update;
+
+            const double drift_displacement =
+                state.integrated_drift[particle];
+
+            if (!std::isfinite(drift_displacement)) {
+                throw std::runtime_error(
+                    "Non-finite integrated drift "
+                    "while collecting statistics"
+                );
+            }
+
+            const double drift_delta =
+                drift_displacement - drift_mean;
+
+            drift_mean +=
+                drift_delta / sample_count;
+
+            const double drift_delta_after_update =
+                drift_displacement - drift_mean;
+
+            drift_m2 +=
+                drift_delta *
+                drift_delta_after_update;
         }
 
         if (
@@ -974,6 +1021,73 @@ private:
 
         result.has_velocity_statistics =
             true;
+
+        if (
+            !std::isfinite(drift_mean) ||
+            !std::isfinite(drift_m2)
+        ) {
+            throw std::runtime_error(
+                "Non-finite control-variate statistics"
+            );
+        }
+
+        const double drift_variance =
+            std::max(0.0, drift_m2) /
+            (n - 1.0);
+
+        const double cv_velocity =
+            drift_mean / measurement_time;
+
+        const double cv_standard_error =
+            std::sqrt(drift_variance / n) /
+            measurement_time;
+
+        const double cv_margin =
+            normal_95 * cv_standard_error;
+
+        const double cv_lower =
+            cv_velocity - cv_margin;
+
+        const double cv_upper =
+            cv_velocity + cv_margin;
+
+        const double thermal_velocity =
+            result.mean_velocity - cv_velocity;
+
+        if (
+            !std::isfinite(drift_variance) ||
+            !std::isfinite(cv_velocity) ||
+            !std::isfinite(cv_standard_error) ||
+            !std::isfinite(cv_lower) ||
+            !std::isfinite(cv_upper) ||
+            !std::isfinite(thermal_velocity)
+        ) {
+            throw std::runtime_error(
+                "Non-finite control-variate uncertainty"
+            );
+        }
+
+        result.control_variate_velocity =
+            cv_velocity;
+
+        result.control_variate_standard_error =
+            cv_standard_error;
+
+        result.control_variate_ci95_lower =
+            cv_lower;
+
+        result.control_variate_ci95_upper =
+            cv_upper;
+
+        result.integrated_drift_variance =
+            drift_variance;
+
+        result.mean_thermal_velocity =
+            thermal_velocity;
+
+        result.has_control_variate_statistics =
+            true;
+
     }
 
     [[nodiscard]] bool advance_particle_(
@@ -984,6 +1098,7 @@ private:
         std::normal_distribution<double>&
             gaussian_distribution,
         double factor,
+        double& integrated_drift,
         const char*& failure_reason
     ) const noexcept {
     failure_reason = nullptr;
@@ -1069,14 +1184,17 @@ private:
         return false;
     }
 
-    const double delta_x =
-        -0.5 *
-        (
-            derivative_now +
-            derivative_predicted
-        ) *
-        params_.dt +
-        thermal_increment;
+        const double drift_increment =
+            -0.5 *
+            (
+                derivative_now +
+                derivative_predicted
+            ) *
+            params_.dt;
+
+        const double delta_x =
+            drift_increment +
+            thermal_increment;
 
     if (!std::isfinite(delta_x)) {
         failure_reason =
@@ -1116,6 +1234,7 @@ private:
         * Состояние частицы обновляем только после
         * прохождения всех проверок.
          */
+        integrated_drift += drift_increment;
         x_unwrapped = next_x;
         x_wrapped = next_coordinate;
 

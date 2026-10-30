@@ -521,6 +521,59 @@ void SimulationWorker::run() {
             );
         }
 
+        statistics.insert(
+        "control_variate_available",
+            result.has_control_variate_statistics
+        );
+
+        if (result.has_control_variate_statistics) {
+            statistics.insert(
+                "control_variate_velocity",
+                result.control_variate_velocity
+            );
+
+            statistics.insert(
+                "control_variate_standard_error",
+                result.control_variate_standard_error
+            );
+
+            statistics.insert(
+                "control_variate_ci95_lower",
+                result.control_variate_ci95_lower
+            );
+
+            statistics.insert(
+                "control_variate_ci95_upper",
+                result.control_variate_ci95_upper
+            );
+
+            statistics.insert(
+                "integrated_drift_variance",
+                result.integrated_drift_variance
+            );
+
+            statistics.insert(
+                "mean_thermal_velocity",
+                result.mean_thermal_velocity
+            );
+
+            const bool contains_zero =
+                result.control_variate_ci95_lower <= 0.0 &&
+                result.control_variate_ci95_upper >= 0.0;
+
+            statistics.insert(
+                "control_variate_ci95_contains_zero",
+                contains_zero
+            );
+
+            statistics.insert(
+                "control_variate_method",
+                QStringLiteral(
+                    "same_thermal_noise_fixed_beta_1"
+                )
+            );
+        }
+
         emit statistics_ready(
             statistics
         );
