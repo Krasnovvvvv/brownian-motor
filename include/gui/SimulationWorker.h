@@ -7,6 +7,7 @@
 
 #include <QObject>
 #include <QtGlobal>
+#include <QJsonObject>
 
 #include <cstddef>
 #include <cstdint>
@@ -104,6 +105,10 @@ public slots:
         const QString& backend,
         qulonglong intervals,
         double preparation_seconds
+    );
+
+    void statistics_ready(
+        const QJsonObject& statistics
     );
 
 private:

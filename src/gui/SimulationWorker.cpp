@@ -422,6 +422,109 @@ void SimulationWorker::run() {
                 request_.n_particles
             );
 
+        QJsonObject statistics{
+            {
+                "available",
+                result.has_velocity_statistics
+            },
+            {
+                "particles",
+                static_cast<qint64>(
+                    result.n_particles
+                )
+            },
+            {
+                "cancelled",
+                stop_token.stop_requested()
+            },
+            {
+                "initial_position",
+                request_.x0
+            },
+            {
+                "dt",
+                request_.dt
+            },
+            {
+                "total_time_requested",
+                request_.total_time
+            },
+            {
+                "burn_in_steps_requested",
+                static_cast<qint64>(
+                    request_.burn_in_steps
+                )
+            },
+            {
+                "seed",
+                static_cast<qint64>(
+                    request_.seed
+                )
+            }
+        };
+
+        if (result.has_velocity_statistics) {
+            statistics.insert(
+                "measurement_time",
+                result.measurement_time
+            );
+
+            statistics.insert(
+                "mean_displacement",
+                result.mean_displacement
+            );
+
+            statistics.insert(
+                "displacement_variance",
+                result.displacement_variance
+            );
+
+            statistics.insert(
+                "mean_squared_displacement",
+                result.mean_squared_displacement
+            );
+
+            statistics.insert(
+                "mean_velocity",
+                result.mean_velocity
+            );
+
+            statistics.insert(
+                "velocity_standard_error",
+                result.velocity_standard_error
+            );
+
+            statistics.insert(
+                "velocity_ci95_lower",
+                result.velocity_ci95_lower
+            );
+
+            statistics.insert(
+                "velocity_ci95_upper",
+                result.velocity_ci95_upper
+            );
+
+            statistics.insert(
+                "ci_method",
+                QStringLiteral(
+                    "normal_approximation_95"
+                )
+            );
+
+            const bool contains_zero =
+                result.velocity_ci95_lower <= 0.0 &&
+                result.velocity_ci95_upper >= 0.0;
+
+            statistics.insert(
+                "ci95_contains_zero",
+                contains_zero
+            );
+        }
+
+        emit statistics_ready(
+            statistics
+        );
+
         emit completed(
             result.mean_velocity,
             result.mean_x_final,

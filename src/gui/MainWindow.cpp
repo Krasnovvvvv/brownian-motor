@@ -1677,6 +1677,112 @@ void MainWindow::start_simulation_() {
         cancellation_source_
     };
 
+        connect(
+        simulation_worker_,
+        &SimulationWorker::statistics_ready,
+        this,
+        [this](
+            const QJsonObject& statistics
+        ) {
+            log_experiment_event_(
+                "simulation_statistics",
+                statistics
+            );
+
+            if (
+                !statistics
+                    .value("available")
+                    .toBool()
+            ) {
+                append_log_(
+                    "Velocity statistics unavailable: "
+                    "the run may be incomplete or "
+                    "contain fewer than two particles."
+                );
+
+                return;
+            }
+
+            const double velocity =
+                statistics
+                    .value("mean_velocity")
+                    .toDouble();
+
+            const double standard_error =
+                statistics
+                    .value("velocity_standard_error")
+                    .toDouble();
+
+            const double lower =
+                statistics
+                    .value("velocity_ci95_lower")
+                    .toDouble();
+
+            const double upper =
+                statistics
+                    .value("velocity_ci95_upper")
+                    .toDouble();
+
+            const bool contains_zero =
+                statistics
+                    .value("ci95_contains_zero")
+                    .toBool();
+
+            append_log_(
+                QString(
+                    "Velocity statistics: "
+                    "v = %1; SE = %2; "
+                    "approx. 95% CI = [%3, %4]; "
+                    "zero in CI = %5"
+                )
+                    .arg(velocity, 0, 'e', 8)
+                    .arg(standard_error, 0, 'e', 8)
+                    .arg(lower, 0, 'e', 8)
+                    .arg(upper, 0, 'e', 8)
+                    .arg(
+                        contains_zero
+                            ? QStringLiteral("yes")
+                            : QStringLiteral("no")
+                    )
+            );
+
+            append_log_(
+                QString(
+                    "Displacement statistics: "
+                    "measurement time = %1; "
+                    "mean = %2; "
+                    "sample variance = %3; "
+                    "mean square = %4"
+                )
+                    .arg(
+                        statistics
+                            .value("measurement_time")
+                            .toDouble(),
+                        0, 'g', 10
+                    )
+                    .arg(
+                        statistics
+                            .value("mean_displacement")
+                            .toDouble(),
+                        0, 'e', 8
+                    )
+                    .arg(
+                        statistics
+                            .value("displacement_variance")
+                            .toDouble(),
+                        0, 'e', 8
+                    )
+                    .arg(
+                        statistics
+                            .value("mean_squared_displacement")
+                            .toDouble(),
+                        0, 'e', 8
+                    )
+            );
+        },
+        Qt::QueuedConnection
+    );
+
     connect(
     simulation_worker_,
     &SimulationWorker::profile_prepared,

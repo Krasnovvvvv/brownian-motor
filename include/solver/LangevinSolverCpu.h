@@ -198,6 +198,7 @@ private:
     struct SimulationState final {
         std::vector<double> x_unwrapped;
         std::vector<double> x_wrapped;
+        std::vector<double> x_at_burn_in;
 
         std::vector<std::mt19937> gaussian_rngs;
 
@@ -286,6 +287,11 @@ private:
         SimulationState state;
 
         state.x_unwrapped.assign(
+            params_.n_particles,
+            params_.x0
+        );
+
+        state.x_at_burn_in.assign(
             params_.n_particles,
             params_.x0
         );
@@ -404,7 +410,7 @@ private:
                                     particle
                                 ];
 
-                        double x_at_burn_in = params_.x0;
+                        double& x_at_burn_in = state.x_at_burn_in[particle];
 
                         for (std::size_t step = 0;
                              step < total_steps;
@@ -517,6 +523,12 @@ private:
                 ? (mean_x_final - mean_x_burn_in) /
                   measurement_time
                 : 0.0;
+
+        populate_statistics_(
+           result,
+            state,
+            total_steps - burn_in_steps
+        );
 
         return result;
     }
@@ -640,7 +652,7 @@ private:
                                         particle
                                     ];
 
-                            double x_at_burn_in = params_.x0;
+                            double& x_at_burn_in = state.x_at_burn_in[particle];
 
                             for (std::size_t step = batch_begin;
                                  step < batch_end;
@@ -798,7 +810,170 @@ private:
                   measurement_time
                 : 0.0;
 
+        populate_statistics_(
+            result,
+            state,
+            total_steps - burn_in_steps
+        );
+
         return result;
+    }
+
+        void populate_statistics_(
+        EnsembleResult& result,
+        const SimulationState& state,
+        std::size_t measurement_steps
+    ) const {
+        const std::size_t count =
+            state.x_unwrapped.size();
+
+        if (
+            state.x_at_burn_in.size() != count ||
+            count != params_.n_particles
+        ) {
+            throw std::runtime_error(
+                "Invalid particle arrays for statistics"
+            );
+        }
+
+        if (count < 2 || measurement_steps == 0) {
+            return;
+        }
+
+        const double measurement_time =
+            static_cast<double>(measurement_steps) *
+            params_.dt;
+
+        if (
+            !std::isfinite(measurement_time) ||
+            measurement_time <= 0.0
+        ) {
+            throw std::runtime_error(
+                "Invalid measurement time for statistics"
+            );
+        }
+
+        /*
+         * Welford accumulation:
+         * one pass over particles after the simulation.
+         */
+        double mean = 0.0;
+        double m2 = 0.0;
+
+        for (
+            std::size_t particle = 0;
+            particle < count;
+            ++particle
+        ) {
+            const double displacement =
+                state.x_unwrapped[particle] -
+                state.x_at_burn_in[particle];
+
+            if (!std::isfinite(displacement)) {
+                throw std::runtime_error(
+                    "Non-finite particle displacement "
+                    "while collecting statistics"
+                );
+            }
+
+            const double sample_count =
+                static_cast<double>(particle + 1);
+
+            const double delta =
+                displacement - mean;
+
+            mean += delta / sample_count;
+
+            const double delta_after_update =
+                displacement - mean;
+
+            m2 += delta * delta_after_update;
+        }
+
+        if (
+            !std::isfinite(mean) ||
+            !std::isfinite(m2)
+        ) {
+            throw std::runtime_error(
+                "Non-finite displacement statistics"
+            );
+        }
+
+        const double n =
+            static_cast<double>(count);
+
+        const double nonnegative_m2 =
+            std::max(0.0, m2);
+
+        const double sample_variance =
+            nonnegative_m2 / (n - 1.0);
+
+        const double mean_squared_displacement =
+            nonnegative_m2 / n +
+            mean * mean;
+
+        const double velocity =
+            mean / measurement_time;
+
+        const double standard_error =
+            std::sqrt(sample_variance / n) /
+            measurement_time;
+
+        constexpr double normal_95 =
+            1.959963984540054;
+
+        const double margin =
+            normal_95 * standard_error;
+
+        const double lower =
+            velocity - margin;
+
+        const double upper =
+            velocity + margin;
+
+        if (
+            !std::isfinite(sample_variance) ||
+            !std::isfinite(mean_squared_displacement) ||
+            !std::isfinite(velocity) ||
+            !std::isfinite(standard_error) ||
+            !std::isfinite(lower) ||
+            !std::isfinite(upper)
+        ) {
+            throw std::runtime_error(
+                "Non-finite velocity uncertainty"
+            );
+        }
+
+        result.measurement_time =
+            measurement_time;
+
+        result.mean_displacement =
+            mean;
+
+        result.displacement_variance =
+            sample_variance;
+
+        result.mean_squared_displacement =
+            mean_squared_displacement;
+
+        /*
+         * Use the same displacement mean for both
+         * velocity and its uncertainty.
+         */
+        result.mean_velocity =
+            velocity;
+
+        result.velocity_standard_error =
+            standard_error;
+
+        result.velocity_ci95_lower =
+            lower;
+
+        result.velocity_ci95_upper =
+            upper;
+
+        result.has_velocity_statistics =
+            true;
     }
 
     [[nodiscard]] bool advance_particle_(
