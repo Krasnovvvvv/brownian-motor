@@ -16,67 +16,65 @@
 #include <vector>
 
 namespace {
+    using Clock = std::chrono::steady_clock;
 
-using Clock = std::chrono::steady_clock;
+    volatile double benchmark_sink = 0.0;
 
-volatile double benchmark_sink = 0.0;
-
-[[nodiscard]] double elapsed_seconds(
-    Clock::time_point start,
-    Clock::time_point end
-) {
-    return std::chrono::duration<double>(end - start).count();
-}
-
-[[nodiscard]] double median(std::vector<double> values) {
-    std::sort(values.begin(), values.end());
-    return values[values.size() / 2];
-}
-
-struct TimedRun {
-    double seconds{};
-    double checksum{};
-};
-
-template <typename Force>
-[[nodiscard]] TimedRun measure_force(
-    const std::vector<double>& coordinates,
-    std::size_t rounds,
-    Force&& force
-) {
-    const auto start = Clock::now();
-    double total = 0.0;
-
-    for (std::size_t round = 0; round < rounds; ++round) {
-        const double offset =
-            static_cast<double>(round % 31) * 1.0e-6;
-        double local = 0.0;
-
-        for (std::size_t i = 0; i < coordinates.size(); ++i) {
-            const double x = coordinates[i] + offset;
-            const double factor = i % 2 == 0 ? 1.0 : -1.0 / 3.0;
-            local += force(x, factor);
-            local += force(x + 0.00031, factor);
-        }
-
-        total += local;
-        benchmark_sink = total;
+    [[nodiscard]] double elapsed_seconds(
+        Clock::time_point start,
+        Clock::time_point end
+    ) {
+        return std::chrono::duration<double>(end - start).count();
     }
 
-    const auto end = Clock::now();
-    return {elapsed_seconds(start, end), total};
-}
+    [[nodiscard]] double median(std::vector<double> values) {
+        std::sort(values.begin(), values.end());
+        return values[values.size() / 2];
+    }
 
+    struct TimedRun {
+        double seconds{};
+        double checksum{};
+    };
+
+    template<typename Force>
+    [[nodiscard]] TimedRun measure_force(
+        const std::vector<double> &coordinates,
+        std::size_t rounds,
+        Force &&force
+    ) {
+        const auto start = Clock::now();
+        double total = 0.0;
+
+        for (std::size_t round = 0; round < rounds; ++round) {
+            const double offset =
+                    static_cast<double>(round % 31) * 1.0e-6;
+            double local = 0.0;
+
+            for (std::size_t i = 0; i < coordinates.size(); ++i) {
+                const double x = coordinates[i] + offset;
+                const double factor = i % 2 == 0 ? 1.0 : -1.0 / 3.0;
+                local += force(x, factor);
+                local += force(x + 0.00031, factor);
+            }
+
+            total += local;
+            benchmark_sink = total;
+        }
+
+        const auto end = Clock::now();
+        return {elapsed_seconds(start, end), total};
+    }
 } // namespace
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     try {
         const std::size_t worker_count = argc > 1
-            ? std::stoull(argv[1])
-            : std::min<std::size_t>(
-                8,
-                std::max(1u, std::thread::hardware_concurrency())
-            );
+                                             ? std::stoull(argv[1])
+                                             : std::min<std::size_t>(
+                                                 8,
+                                                 std::max(1u, std::thread::hardware_concurrency())
+                                             );
 
         if (worker_count == 0 || worker_count > 64) {
             std::cerr << "Worker count must be between 1 and 64.\n";
@@ -84,17 +82,17 @@ int main(int argc, char* argv[]) {
         }
 
         const QString path =
-            QString::fromUtf8(BROWNIAN_MOTOR_SOURCE_DIR) +
-            "/resources/potentials/biharmonic-ratchet.bmpotential";
+                QString::fromUtf8(BROWNIAN_MOTOR_SOURCE_DIR) +
+                "/resources/potentials/biharmonic-ratchet.bmpotential";
 
         const auto parsed = PotentialConfigParser::parse_file(path);
         if (!parsed.is_success()) {
             std::cerr << "Potential parse failed: "
-                      << parsed.error_message.toStdString() << '\n';
+                    << parsed.error_message.toStdString() << '\n';
             return EXIT_FAILURE;
         }
 
-        const PotentialDefinition& definition = *parsed.definition;
+        const PotentialDefinition &definition = *parsed.definition;
         const PotentialParameterValues parameters{
             {"V1", 0.2},
             {"V2", 0.1}
@@ -110,7 +108,7 @@ int main(int argc, char* argv[]) {
         };
         const auto prototype_ready = Clock::now();
 
-        std::vector<Potential<ExpressionEvaluator>> worker_potentials;
+        std::vector<Potential<ExpressionEvaluator> > worker_potentials;
         worker_potentials.reserve(worker_count);
         for (std::size_t worker = 0; worker < worker_count; ++worker) {
             worker_potentials.push_back(runtime);
@@ -152,8 +150,8 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        (void)measure_force(coordinates, 4, native_force);
-        (void)measure_force(coordinates, 4, expression_force);
+        (void) measure_force(coordinates, 4, native_force);
+        (void) measure_force(coordinates, 4, expression_force);
 
         std::vector<double> native_times;
         std::vector<double> expression_times;
@@ -192,22 +190,22 @@ int main(int argc, char* argv[]) {
         const std::size_t evaluations = 2 * grid_size * rounds;
 
         std::cout << std::fixed << std::setprecision(6)
-                  << "worker copies: " << worker_count << '\n'
-                  << "initial expression compile (s): "
-                  << elapsed_seconds(setup_begin, prototype_ready) << '\n'
-                  << "worker expression copies and recompiles (s): "
-                  << elapsed_seconds(prototype_ready, workers_ready) << '\n'
-                  << "derivative evaluations per timed run: "
-                  << evaluations << '\n'
-                  << "native median (s): " << native_median << '\n'
-                  << "ExprTk median (s): " << expression_median << '\n'
-                  << "ExprTk / native: "
-                  << expression_median / native_median << "x\n"
-                  << "native checksum: " << native_checksum << '\n'
-                  << "ExprTk checksum: " << expression_checksum << '\n';
+                << "worker copies: " << worker_count << '\n'
+                << "initial expression compile (s): "
+                << elapsed_seconds(setup_begin, prototype_ready) << '\n'
+                << "worker expression copies and recompiles (s): "
+                << elapsed_seconds(prototype_ready, workers_ready) << '\n'
+                << "derivative evaluations per timed run: "
+                << evaluations << '\n'
+                << "native median (s): " << native_median << '\n'
+                << "ExprTk median (s): " << expression_median << '\n'
+                << "ExprTk / native: "
+                << expression_median / native_median << "x\n"
+                << "native checksum: " << native_checksum << '\n'
+                << "ExprTk checksum: " << expression_checksum << '\n';
 
         return EXIT_SUCCESS;
-    } catch (const std::exception& error) {
+    } catch (const std::exception &error) {
         std::cerr << "Benchmark failed: " << error.what() << '\n';
         return EXIT_FAILURE;
     }

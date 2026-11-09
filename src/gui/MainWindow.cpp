@@ -58,10 +58,9 @@
 #include "gui/ModulationPanel.h"
 
 namespace {
-
     [[nodiscard]] QString format_elapsed_time(
-    qint64 milliseconds
-) {
+        qint64 milliseconds
+    ) {
         if (milliseconds < 0) {
             return QStringLiteral("--");
         }
@@ -71,19 +70,19 @@ namespace {
         constexpr qint64 milliseconds_per_hour = 3'600'000;
 
         const qint64 hours =
-            milliseconds / milliseconds_per_hour;
+                milliseconds / milliseconds_per_hour;
 
         const qint64 minutes =
-            (milliseconds / milliseconds_per_minute) % 60;
+                (milliseconds / milliseconds_per_minute) % 60;
 
         const qint64 seconds =
-            (milliseconds / milliseconds_per_second) % 60;
+                (milliseconds / milliseconds_per_second) % 60;
 
         const qint64 remainder =
-            milliseconds % milliseconds_per_second;
+                milliseconds % milliseconds_per_second;
 
         const QString seconds_text =
-            QStringLiteral("%1.%2 s")
+                QStringLiteral("%1.%2 s")
                 .arg(seconds)
                 .arg(
                     remainder,
@@ -94,15 +93,15 @@ namespace {
 
         if (hours > 0) {
             return QStringLiteral("%1 h %2 m %3")
-                .arg(hours)
-                .arg(minutes)
-                .arg(seconds_text);
+                    .arg(hours)
+                    .arg(minutes)
+                    .arg(seconds_text);
         }
 
         if (minutes > 0) {
             return QStringLiteral("%1 m %2")
-                .arg(minutes)
-                .arg(seconds_text);
+                    .arg(minutes)
+                    .arg(seconds_text);
         }
 
         return seconds_text;
@@ -112,15 +111,15 @@ namespace {
         double seconds
     ) {
         const double milliseconds =
-            seconds * 1000.0;
+                seconds * 1000.0;
 
         if (
             !std::isfinite(milliseconds) ||
             milliseconds < 0.0 ||
             milliseconds >=
-                static_cast<double>(
-                    std::numeric_limits<qint64>::max()
-                )
+            static_cast<double>(
+                std::numeric_limits<qint64>::max()
+            )
         ) {
             return QStringLiteral("--");
         }
@@ -132,70 +131,163 @@ namespace {
         );
     }
 
-[[nodiscard]] CompactDoubleSpinBox* make_double_spin_box(
-    double minimum,
-    double maximum,
-    double value,
-    int decimals,
-    double step
-) {
-    auto* spin_box = new CompactDoubleSpinBox;
+    [[nodiscard]] CompactDoubleSpinBox *make_double_spin_box(
+        double minimum,
+        double maximum,
+        double value,
+        int decimals,
+        double step
+    ) {
+        auto *spin_box = new CompactDoubleSpinBox;
 
-    spin_box->setRange(minimum, maximum);
-    spin_box->setValue(value);
-    spin_box->setDecimals(decimals);
-    spin_box->setSingleStep(step);
-    spin_box->setKeyboardTracking(false);
+        spin_box->setRange(minimum, maximum);
+        spin_box->setValue(value);
+        spin_box->setDecimals(decimals);
+        spin_box->setSingleStep(step);
+        spin_box->setKeyboardTracking(false);
 
-    return spin_box;
-}
+        return spin_box;
+    }
 
-[[nodiscard]] QSpinBox* make_spin_box(
-    int minimum,
-    int maximum,
-    int value,
-    int step = 1
-) {
-    auto* spin_box = new QSpinBox;
+    [[nodiscard]] QSpinBox *make_spin_box(
+        int minimum,
+        int maximum,
+        int value,
+        int step = 1
+    ) {
+        auto *spin_box = new QSpinBox;
 
-    spin_box->setRange(minimum, maximum);
-    spin_box->setValue(value);
-    spin_box->setSingleStep(step);
-    spin_box->setKeyboardTracking(false);
+        spin_box->setRange(minimum, maximum);
+        spin_box->setValue(value);
+        spin_box->setSingleStep(step);
+        spin_box->setKeyboardTracking(false);
 
-    return spin_box;
-}
+        return spin_box;
+    }
 
-[[nodiscard]] QLabel* make_result_label() {
-    auto* label = new QLabel{"—"};
+    [[nodiscard]] QLabel *make_result_label() {
+        auto *label = new QLabel{"—"};
 
-    label->setTextInteractionFlags(
-        Qt::TextSelectableByMouse
-    );
+        label->setTextInteractionFlags(
+            Qt::TextSelectableByMouse
+        );
 
-    return label;
-}
+        return label;
+    }
 
     void configure_group_title(
-    QGroupBox* group
-) {
-    group->setAlignment(
-        Qt::AlignHCenter
-    );
+        QGroupBox *group
+    ) {
+        group->setAlignment(
+            Qt::AlignHCenter
+        );
 
-    group->setStyleSheet(
-        "QGroupBox {"
-        "    font-size: 11pt;"
-        "    font-weight: bold;"
-        "}"
-    );
-}
+        group->setStyleSheet(
+            "QGroupBox {"
+            "    font-size: 11pt;"
+            "    font-weight: bold;"
+            "}"
+        );
+    }
 
+    [[nodiscard]] QString format_velocity_with_se(
+        double velocity,
+        double standard_error
+    ) {
+        if (
+            !std::isfinite(velocity) ||
+            !std::isfinite(standard_error) ||
+            standard_error < 0.0
+        ) {
+            return QStringLiteral("--");
+        }
+
+        /*
+         * Общую степень выбираем по большей величине.
+         * Это также корректно обрабатывает v = 0
+         * и случаи SE > |v|.
+         */
+        const double reference =
+                std::max(
+                    std::abs(velocity),
+                    standard_error
+                );
+
+        if (reference == 0.0) {
+            return QStringLiteral(
+                "(0.000000 \u00B1 0.000000)e+00"
+            );
+        }
+
+        const QString scientific_reference =
+                QString::number(
+                    reference,
+                    'e',
+                    16
+                );
+
+        const int exponent_position =
+                scientific_reference.indexOf(
+                    QLatin1Char('e')
+                );
+
+        const double reference_mantissa =
+                scientific_reference
+                .left(exponent_position)
+                .toDouble();
+
+        const int exponent =
+                scientific_reference
+                .mid(exponent_position + 1)
+                .toInt();
+
+        /*
+         * Нормализация без прямого вычисления 10^exponent.
+         */
+        const double velocity_mantissa =
+                (velocity / reference) *
+                reference_mantissa;
+
+        const double error_mantissa =
+                (standard_error / reference) *
+                reference_mantissa;
+
+        const QString exponent_sign =
+                exponent < 0
+                    ? QStringLiteral("-")
+                    : QStringLiteral("+");
+
+        const QString exponent_digits =
+                QStringLiteral("%1")
+                .arg(
+                    std::abs(exponent),
+                    2,
+                    10,
+                    QLatin1Char('0')
+                );
+
+        return QStringLiteral(
+                    "(%1 \u00B1 %2)e%3%4"
+                )
+                .arg(
+                    velocity_mantissa,
+                    0,
+                    'f',
+                    6
+                )
+                .arg(
+                    error_mantissa,
+                    0,
+                    'f',
+                    6
+                )
+                .arg(exponent_sign)
+                .arg(exponent_digits);
+    }
 } // namespace
 
-MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow{parent}
-{
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow{parent} {
     setMinimumSize(1100, 600);
 
     create_interface_();
@@ -222,8 +314,8 @@ MainWindow::MainWindow(QWidget* parent)
 
     trajectory_dialog_->installEventFilter(this);
 
-    auto* trajectory_layout =
-        new QHBoxLayout{trajectory_dialog_};
+    auto *trajectory_layout =
+            new QHBoxLayout{trajectory_dialog_};
 
     trajectory_layout->setContentsMargins(
         10,
@@ -238,61 +330,61 @@ MainWindow::MainWindow(QWidget* parent)
         trajectory_dialog_
     };
 
-auto* analysis_panel = new QWidget{
-    trajectory_dialog_
-};
+    auto *analysis_panel = new QWidget{
+        trajectory_dialog_
+    };
 
-analysis_panel->setFixedWidth(250);
+    analysis_panel->setFixedWidth(250);
 
-auto* analysis_layout = new QVBoxLayout{
-    analysis_panel
-};
+    auto *analysis_layout = new QVBoxLayout{
+        analysis_panel
+    };
 
-analysis_layout->setContentsMargins(
-    0,
-    0,
-    0,
-    0
-);
+    analysis_layout->setContentsMargins(
+        0,
+        0,
+        0,
+        0
+    );
 
-analysis_layout->setSpacing(10);
+    analysis_layout->setSpacing(10);
 
-auto* trend_group = new QGroupBox{
-    "Trend analysis",
-    analysis_panel
-};
+    auto *trend_group = new QGroupBox{
+        "Trend analysis",
+        analysis_panel
+    };
 
-trend_group->setAlignment(
-    Qt::AlignHCenter
-);
+    trend_group->setAlignment(
+        Qt::AlignHCenter
+    );
 
-auto* trend_layout = new QVBoxLayout{
-    trend_group
-};
+    auto *trend_layout = new QVBoxLayout{
+        trend_group
+    };
 
-trend_layout->setContentsMargins(
-    10,
-    12,
-    10,
-    10
-);
+    trend_layout->setContentsMargins(
+        10,
+        12,
+        10,
+        10
+    );
 
-trend_layout->setSpacing(8);
+    trend_layout->setSpacing(8);
 
-select_trend_button_ = new QPushButton{
-    "Select trend start",
-    trend_group
-};
+    select_trend_button_ = new QPushButton{
+        "Select trend start",
+        trend_group
+    };
 
-select_trend_button_->setToolTip(
-    "Choose the first point used for the linear "
-    "regression after the simulation has completed."
-);
+    select_trend_button_->setToolTip(
+        "Choose the first point used for the linear "
+        "regression after the simulation has completed."
+    );
 
-clear_trend_button_ = new QPushButton{
-    "Clear trend",
-    trend_group
-};
+    clear_trend_button_ = new QPushButton{
+        "Clear trend",
+        trend_group
+    };
 
     highlight_trend_range_check_ = new QCheckBox{
         "Highlight trend range",
@@ -306,163 +398,163 @@ clear_trend_button_ = new QPushButton{
         "trajectory range used for the linear trend."
     );
 
-clear_trend_button_->setToolTip(
-    "Remove the selected trend or cancel "
-    "point selection."
-);
+    clear_trend_button_->setToolTip(
+        "Remove the selected trend or cancel "
+        "point selection."
+    );
 
-trend_info_label_ = new QLabel{
-    "Trend: available after simulation completes",
-    trend_group
-};
+    trend_info_label_ = new QLabel{
+        "Trend: available after simulation completes",
+        trend_group
+    };
 
-trend_info_label_->setWordWrap(true);
+    trend_info_label_->setWordWrap(true);
 
-trend_info_label_->setMinimumHeight(84);
+    trend_info_label_->setMinimumHeight(84);
 
-trend_info_label_->setAlignment(
-    Qt::AlignLeft | Qt::AlignTop
-);
-
-trend_layout->addWidget(
-    select_trend_button_
-);
-
-trend_layout->addWidget(
-    clear_trend_button_
-);
+    trend_info_label_->setAlignment(
+        Qt::AlignLeft | Qt::AlignTop
+    );
 
     trend_layout->addWidget(
-    highlight_trend_range_check_
-);
+        select_trend_button_
+    );
 
-trend_layout->addWidget(
-    trend_info_label_
-);
+    trend_layout->addWidget(
+        clear_trend_button_
+    );
 
-auto* burn_in_group = new QGroupBox{
-    "Burn-in validation",
-    analysis_panel
-};
+    trend_layout->addWidget(
+        highlight_trend_range_check_
+    );
 
-burn_in_group->setAlignment(
-    Qt::AlignHCenter
-);
+    trend_layout->addWidget(
+        trend_info_label_
+    );
 
-auto* burn_in_layout = new QVBoxLayout{
-    burn_in_group
-};
+    auto *burn_in_group = new QGroupBox{
+        "Burn-in validation",
+        analysis_panel
+    };
 
-burn_in_layout->setContentsMargins(
-    10,
-    12,
-    10,
-    10
-);
+    burn_in_group->setAlignment(
+        Qt::AlignHCenter
+    );
 
-burn_in_layout->setSpacing(8);
+    auto *burn_in_layout = new QVBoxLayout{
+        burn_in_group
+    };
 
-burn_in_tolerance_spin_ = make_spin_box(
-    5,
-    50,
-    25,
-    5
-);
+    burn_in_layout->setContentsMargins(
+        10,
+        12,
+        10,
+        10
+    );
 
-burn_in_tolerance_spin_->setSuffix("%");
+    burn_in_layout->setSpacing(8);
 
-burn_in_tolerance_spin_->setToolTip(
-    "Maximum allowed relative difference "
-    "between early and late tail velocities."
-);
+    burn_in_tolerance_spin_ = make_spin_box(
+        5,
+        50,
+        25,
+        5
+    );
 
-auto* tolerance_form = new QFormLayout;
+    burn_in_tolerance_spin_->setSuffix("%");
 
-tolerance_form->setContentsMargins(
-    0,
-    0,
-    0,
-    0
-);
+    burn_in_tolerance_spin_->setToolTip(
+        "Maximum allowed relative difference "
+        "between early and late tail velocities."
+    );
 
-tolerance_form->addRow(
-    "Velocity tolerance:",
-    burn_in_tolerance_spin_
-);
+    auto *tolerance_form = new QFormLayout;
 
-validate_burn_in_button_ = new QPushButton{
-    "Validate burn-in",
-    burn_in_group
-};
+    tolerance_form->setContentsMargins(
+        0,
+        0,
+        0,
+        0
+    );
 
-validate_burn_in_button_->setToolTip(
-    "Find the earliest trajectory segment "
-    "whose early and late velocities agree "
-    "within the selected tolerance."
-);
+    tolerance_form->addRow(
+        "Velocity tolerance:",
+        burn_in_tolerance_spin_
+    );
 
-clear_burn_in_button_ = new QPushButton{
-    "Clear validation",
-    burn_in_group
-};
+    validate_burn_in_button_ = new QPushButton{
+        "Validate burn-in",
+        burn_in_group
+    };
 
-clear_burn_in_button_->setToolTip(
-    "Remove the burn-in recommendation "
-    "and graph marker."
-);
+    validate_burn_in_button_->setToolTip(
+        "Find the earliest trajectory segment "
+        "whose early and late velocities agree "
+        "within the selected tolerance."
+    );
 
-burn_in_info_label_ = new QLabel{
-    "Burn-in: not validated",
-    burn_in_group
-};
+    clear_burn_in_button_ = new QPushButton{
+        "Clear validation",
+        burn_in_group
+    };
 
-burn_in_info_label_->setWordWrap(true);
+    clear_burn_in_button_->setToolTip(
+        "Remove the burn-in recommendation "
+        "and graph marker."
+    );
 
-burn_in_info_label_->setMinimumHeight(152);
+    burn_in_info_label_ = new QLabel{
+        "Burn-in: not validated",
+        burn_in_group
+    };
 
-burn_in_info_label_->setAlignment(
-    Qt::AlignLeft | Qt::AlignTop
-);
+    burn_in_info_label_->setWordWrap(true);
 
-burn_in_layout->addLayout(
-    tolerance_form
-);
+    burn_in_info_label_->setMinimumHeight(152);
 
-burn_in_layout->addWidget(
-    validate_burn_in_button_
-);
+    burn_in_info_label_->setAlignment(
+        Qt::AlignLeft | Qt::AlignTop
+    );
 
-burn_in_layout->addWidget(
-    clear_burn_in_button_
-);
+    burn_in_layout->addLayout(
+        tolerance_form
+    );
 
-burn_in_layout->addWidget(
-    burn_in_info_label_
-);
+    burn_in_layout->addWidget(
+        validate_burn_in_button_
+    );
 
-export_button_ = new QPushButton{
-    "Export...",
-    analysis_panel
-};
+    burn_in_layout->addWidget(
+        clear_burn_in_button_
+    );
 
-export_button_->setToolTip(
-    "Export trajectory data as CSV or save "
-    "the graph as PNG or JPG."
-);
+    burn_in_layout->addWidget(
+        burn_in_info_label_
+    );
 
-analysis_layout->addWidget(
-    trend_group
-);
+    export_button_ = new QPushButton{
+        "Export...",
+        analysis_panel
+    };
 
-analysis_layout->addWidget(
-    burn_in_group
-);
+    export_button_->setToolTip(
+        "Export trajectory data as CSV or save "
+        "the graph as PNG or JPG."
+    );
 
-analysis_layout->addWidget(
-    export_button_
-);
+    analysis_layout->addWidget(
+        trend_group
+    );
 
-analysis_layout->addStretch(1);
+    analysis_layout->addWidget(
+        burn_in_group
+    );
+
+    analysis_layout->addWidget(
+        export_button_
+    );
+
+    analysis_layout->addStretch(1);
 
     trajectory_layout->addWidget(
         trajectory_plot_,
@@ -492,19 +584,19 @@ analysis_layout->addStretch(1);
     );
 
     connect(
-    highlight_trend_range_check_,
-    &QCheckBox::toggled,
-    this,
-    [this](bool checked) {
-        if (!trajectory_plot_) {
-            return;
-        }
+        highlight_trend_range_check_,
+        &QCheckBox::toggled,
+        this,
+        [this](bool checked) {
+            if (!trajectory_plot_) {
+                return;
+            }
 
-        trajectory_plot_->set_trend_range_highlight_visible(
-            checked
-        );
-    }
-);
+            trajectory_plot_->set_trend_range_highlight_visible(
+                checked
+            );
+        }
+    );
 
     connect(
         validate_burn_in_button_,
@@ -565,11 +657,11 @@ analysis_layout->addStretch(1);
         &TrajectoryPlotWidget::trend_changed,
         this,
         [this](
-            double start_time,
-            double intercept,
-            double slope,
-            double r_squared
-        ) {
+    double start_time,
+    double intercept,
+    double slope,
+    double r_squared
+) {
             //Q_UNUSED(intercept);
 
             select_trend_button_->setText(
@@ -583,38 +675,38 @@ analysis_layout->addStretch(1);
                     "v = %2\n"
                     "R² = %3"
                 }
-                    .arg(start_time, 0, 'g', 6)
-                    .arg(slope, 0, 'e', 4)
-                    .arg(r_squared, 0, 'f', 4)
+                .arg(start_time, 0, 'g', 6)
+                .arg(slope, 0, 'e', 4)
+                .arg(r_squared, 0, 'f', 4)
             );
 
             log_experiment_event_(
-    "trend_fitted",
-    QJsonObject{
-        {
-            "start_time",
-            start_time
-        },
-        {
-            "intercept",
-            intercept
-        },
-        {
-            "slope",
-            slope
-        },
-        {
-            "r_squared",
-            r_squared
-        },
-        {
-            "trajectory_points",
-            static_cast<qint64>(
-                trajectory_plot_->point_count()
-            )
-        }
-    }
-);
+                "trend_fitted",
+                QJsonObject{
+                    {
+                        "start_time",
+                        start_time
+                    },
+                    {
+                        "intercept",
+                        intercept
+                    },
+                    {
+                        "slope",
+                        slope
+                    },
+                    {
+                        "r_squared",
+                        r_squared
+                    },
+                    {
+                        "trajectory_points",
+                        static_cast<qint64>(
+                            trajectory_plot_->point_count()
+                        )
+                    }
+                }
+            );
             update_plot_tools_();
         }
     );
@@ -647,7 +739,7 @@ analysis_layout->addStretch(1);
         trajectory_plot_,
         &TrajectoryPlotWidget::trend_selection_failed,
         this,
-        [this](const QString& message) {
+        [this](const QString &message) {
             select_trend_button_->setText(
                 "Select trend start"
             );
@@ -667,93 +759,92 @@ analysis_layout->addStretch(1);
         &TrajectoryPlotWidget::burn_in_validation_changed,
         this,
         [this](
-            bool stable,
-            std::size_t recommended_steps,
-            double start_time,
-            double early_velocity,
-            double late_velocity,
-            double tail_velocity,
-            double relative_difference,
-            double tail_r_squared,
-            double tolerance
-        ) {
-
+    bool stable,
+    std::size_t recommended_steps,
+    double start_time,
+    double early_velocity,
+    double late_velocity,
+    double tail_velocity,
+    double relative_difference,
+    double tail_r_squared,
+    double tolerance
+) {
             log_experiment_event_(
-    stable
-        ? "burn_in_validated"
-        : "burn_in_inconclusive",
-    QJsonObject{
-        {
-            "stable",
-            stable
-        },
-        {
-            "tolerance_percent",
-            100.0 * tolerance
-        },
+                stable
+                    ? "burn_in_validated"
+                    : "burn_in_inconclusive",
+                QJsonObject{
+                    {
+                        "stable",
+                        stable
+                    },
+                    {
+                        "tolerance_percent",
+                        100.0 * tolerance
+                    },
 
-        {
-            "trajectory_points",
-                static_cast<qint64>(
-                trajectory_plot_->point_count()
-                )
-          },
+                    {
+                        "trajectory_points",
+                        static_cast<qint64>(
+                            trajectory_plot_->point_count()
+                        )
+                    },
 
-        {
-            "recommended_burn_in_steps",
-            static_cast<qint64>(
-                recommended_steps
-            )
-        },
-        {
-            "start_time",
-            start_time
-        },
-        {
-            "early_velocity",
-            early_velocity
-        },
-        {
-            "late_velocity",
-            late_velocity
-        },
-        {
-            "tail_velocity",
-            tail_velocity
-        },
-        {
-            "velocity_difference_percent",
-            100.0 * relative_difference
-        },
-        {
-            "tail_r_squared",
-            tail_r_squared
-        }
-    }
-);
+                    {
+                        "recommended_burn_in_steps",
+                        static_cast<qint64>(
+                            recommended_steps
+                        )
+                    },
+                    {
+                        "start_time",
+                        start_time
+                    },
+                    {
+                        "early_velocity",
+                        early_velocity
+                    },
+                    {
+                        "late_velocity",
+                        late_velocity
+                    },
+                    {
+                        "tail_velocity",
+                        tail_velocity
+                    },
+                    {
+                        "velocity_difference_percent",
+                        100.0 * relative_difference
+                    },
+                    {
+                        "tail_r_squared",
+                        tail_r_squared
+                    }
+                }
+            );
             if (!stable) {
-    const QString tolerance_text = QString{
-        "%1%"
-    }.arg(
-        100.0 * tolerance,
-        0,
-        'f',
-        1
-    );
+                const QString tolerance_text = QString{
+                    "%1%"
+                }.arg(
+                    100.0 * tolerance,
+                    0,
+                    'f',
+                    1
+                );
 
-    burn_in_info_label_->setText(
-        QString{
-            "Burn-in: inconclusive\n"
-            "No stable tail found at %1 "
-            "velocity tolerance.\n"
-            "Increase tolerance, total time, "
-            "or particle count."
-        }.arg(tolerance_text)
-    );
+                burn_in_info_label_->setText(
+                    QString{
+                        "Burn-in: inconclusive\n"
+                        "No stable tail found at %1 "
+                        "velocity tolerance.\n"
+                        "Increase tolerance, total time, "
+                        "or particle count."
+                    }.arg(tolerance_text)
+                );
 
-    update_plot_tools_();
-    return;
-}
+                update_plot_tools_();
+                return;
+            }
 
             burn_in_info_label_->setText(
                 QString{
@@ -766,25 +857,25 @@ analysis_layout->addStretch(1);
                     "Difference: %6\n"
                     "Tail fit R²: %7"
                 }
-                    .arg(start_time, 0, 'g', 8)
-                    .arg(
-                        static_cast<qulonglong>(
-                            recommended_steps
-                        )
+                .arg(start_time, 0, 'g', 8)
+                .arg(
+                    static_cast<qulonglong>(
+                        recommended_steps
                     )
-                    .arg(early_velocity, 0, 'e', 4)
-                    .arg(late_velocity, 0, 'e', 4)
-                    .arg(tail_velocity, 0, 'e', 4)
+                )
+                .arg(early_velocity, 0, 'e', 4)
+                .arg(late_velocity, 0, 'e', 4)
+                .arg(tail_velocity, 0, 'e', 4)
+                .arg(
+                    QString{"%1%"}
                     .arg(
-                        QString{"%1%"}
-                            .arg(
-                                100.0 * relative_difference,
-                                0,
-                                'f',
-                                2
-                            )
+                        100.0 * relative_difference,
+                        0,
+                        'f',
+                        2
                     )
-                    .arg(tail_r_squared, 0, 'f', 4)
+                )
+                .arg(tail_r_squared, 0, 'f', 4)
             );
 
             update_plot_tools_();
@@ -808,7 +899,7 @@ analysis_layout->addStretch(1);
         trajectory_plot_,
         &TrajectoryPlotWidget::burn_in_validation_failed,
         this,
-        [this](const QString& message) {
+        [this](const QString &message) {
             QMessageBox::information(
                 trajectory_dialog_,
                 "Burn-in validation",
@@ -843,13 +934,13 @@ analysis_layout->addStretch(1);
     );
 
     log_experiment_event_(
-    "application_started",
-    QJsonObject{
-        {
-            "log_file",
-            experiment_logger_.log_file_path()
+        "application_started",
+        QJsonObject{
+            {
+                "log_file",
+                experiment_logger_.log_file_path()
+            }
         }
-    }
     );
 
     append_log_(
@@ -876,168 +967,168 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::create_interface_() {
-    auto* central_widget = new QWidget{this};
+    auto *central_widget = new QWidget{this};
     setCentralWidget(central_widget);
 
-    auto* root_layout = new QVBoxLayout{central_widget};
+    auto *root_layout = new QVBoxLayout{central_widget};
 
-    auto* parameters_layout = new QHBoxLayout;
+    auto *parameters_layout = new QHBoxLayout;
     root_layout->addLayout(parameters_layout);
 
-auto* potential_group = new QGroupBox{
-    "Potential",
-    central_widget
-};
+    auto *potential_group = new QGroupBox{
+        "Potential",
+        central_widget
+    };
 
-configure_group_title(
-    potential_group
-);
+    configure_group_title(
+        potential_group
+    );
 
-auto* potential_layout = new QVBoxLayout{
-    potential_group
-};
-
-potential_layout->setContentsMargins(
-    8,
-    12,
-    8,
-    8
-);
-
-potential_layout->setSpacing(6);
-
-auto* potential_buttons_layout =
-    new QHBoxLayout;
-
-open_potential_button_ = new QPushButton{
-    "Open potential...",
-    potential_group
-};
-
-builtin_potential_button_ = new QPushButton{
-    "Use built-in",
-    potential_group
-};
-
-potential_buttons_layout->addWidget(
-    open_potential_button_
-);
-
-potential_buttons_layout->addWidget(
-    builtin_potential_button_
-);
-
-potential_drop_area_ =
-    new PotentialDropArea{
+    auto *potential_layout = new QVBoxLayout{
         potential_group
     };
 
-potential_info_label_ = new QLabel{
-    "Potential is not selected",
-    potential_group
-};
-
-potential_info_label_->setWordWrap(
-    true
-);
-
-potential_info_label_->setMinimumHeight(
-    36
-);
-
-potential_parameters_scroll_ =
-    new QScrollArea{
-        potential_group
-    };
-
-potential_parameters_scroll_->
-    setWidgetResizable(true);
-
-potential_parameters_scroll_->
-    setFrameShape(
-        QFrame::NoFrame
-    );
-
-potential_parameters_scroll_->
-    setHorizontalScrollBarPolicy(
-        Qt::ScrollBarAlwaysOff
-    );
-
-potential_parameters_scroll_->
-    setVerticalScrollBarPolicy(
-        Qt::ScrollBarAsNeeded
-    );
-
-potential_parameters_scroll_->
-    setMinimumHeight(70);
-
-auto* potential_parameters_content =
-    new QWidget{
-        potential_parameters_scroll_
-    };
-
-potential_parameters_form_ =
-    new QFormLayout{
-        potential_parameters_content
-    };
-
-potential_parameters_form_->
-    setContentsMargins(
-        2,
-        2,
+    potential_layout->setContentsMargins(
         8,
-        2
+        12,
+        8,
+        8
     );
 
-potential_parameters_form_->
-    setVerticalSpacing(6);
+    potential_layout->setSpacing(6);
 
-potential_parameters_form_->
-    setRowWrapPolicy(
-        QFormLayout::WrapLongRows
+    auto *potential_buttons_layout =
+            new QHBoxLayout;
+
+    open_potential_button_ = new QPushButton{
+        "Open potential...",
+        potential_group
+    };
+
+    builtin_potential_button_ = new QPushButton{
+        "Use built-in",
+        potential_group
+    };
+
+    potential_buttons_layout->addWidget(
+        open_potential_button_
     );
 
-potential_parameters_form_->
-    setSizeConstraint(
-        QLayout::SetMinAndMaxSize
+    potential_buttons_layout->addWidget(
+        builtin_potential_button_
     );
 
-potential_parameters_scroll_->
-    setWidget(
-        potential_parameters_content
+    potential_drop_area_ =
+            new PotentialDropArea{
+                potential_group
+            };
+
+    potential_info_label_ = new QLabel{
+        "Potential is not selected",
+        potential_group
+    };
+
+    potential_info_label_->setWordWrap(
+        true
     );
 
-potential_layout->addLayout(
-    potential_buttons_layout
-);
+    potential_info_label_->setMinimumHeight(
+        36
+    );
 
-potential_layout->addWidget(
-    potential_drop_area_
-);
+    potential_parameters_scroll_ =
+            new QScrollArea{
+                potential_group
+            };
 
-potential_layout->addWidget(
-    potential_info_label_
-);
+    potential_parameters_scroll_->
+            setWidgetResizable(true);
 
-potential_layout->addWidget(
-    potential_parameters_scroll_,
-    1
-);
+    potential_parameters_scroll_->
+            setFrameShape(
+                QFrame::NoFrame
+            );
 
-parameters_layout->addWidget(
-    potential_group,
-    1
-);
+    potential_parameters_scroll_->
+            setHorizontalScrollBarPolicy(
+                Qt::ScrollBarAlwaysOff
+            );
 
-    auto* modulation_group = new QGroupBox(
+    potential_parameters_scroll_->
+            setVerticalScrollBarPolicy(
+                Qt::ScrollBarAsNeeded
+            );
+
+    potential_parameters_scroll_->
+            setMinimumHeight(70);
+
+    auto *potential_parameters_content =
+            new QWidget{
+                potential_parameters_scroll_
+            };
+
+    potential_parameters_form_ =
+            new QFormLayout{
+                potential_parameters_content
+            };
+
+    potential_parameters_form_->
+            setContentsMargins(
+                2,
+                2,
+                8,
+                2
+            );
+
+    potential_parameters_form_->
+            setVerticalSpacing(6);
+
+    potential_parameters_form_->
+            setRowWrapPolicy(
+                QFormLayout::WrapLongRows
+            );
+
+    potential_parameters_form_->
+            setSizeConstraint(
+                QLayout::SetMinAndMaxSize
+            );
+
+    potential_parameters_scroll_->
+            setWidget(
+                potential_parameters_content
+            );
+
+    potential_layout->addLayout(
+        potential_buttons_layout
+    );
+
+    potential_layout->addWidget(
+        potential_drop_area_
+    );
+
+    potential_layout->addWidget(
+        potential_info_label_
+    );
+
+    potential_layout->addWidget(
+        potential_parameters_scroll_,
+        1
+    );
+
+    parameters_layout->addWidget(
+        potential_group,
+        1
+    );
+
+    auto *modulation_group = new QGroupBox(
         "Modulation",
         central_widget
     );
 
     configure_group_title(modulation_group);
 
-    auto* modulation_layout =
-        new QVBoxLayout(modulation_group);
+    auto *modulation_layout =
+            new QVBoxLayout(modulation_group);
 
     modulation_layout->setContentsMargins(
         8, 12, 8, 8
@@ -1046,7 +1137,7 @@ parameters_layout->addWidget(
     modulation_layout->setSpacing(6);
 
     modulation_panel_ =
-        new ModulationPanel(modulation_group);
+            new ModulationPanel(modulation_group);
 
     modulation_layout->addWidget(
         modulation_panel_
@@ -1063,155 +1154,155 @@ parameters_layout->addWidget(
     );
 
     // Сохраняем прежнее локальное имя для остального кода.
-    auto* simulation_group =
-        simulation_group_;
+    auto *simulation_group =
+            simulation_group_;
 
     simulation_group_->installEventFilter(
         this
     );
     configure_group_title(simulation_group);
-auto* simulation_group_layout = new QVBoxLayout{
-    simulation_group
-};
+    auto *simulation_group_layout = new QVBoxLayout{
+        simulation_group
+    };
 
-simulation_group_layout->setContentsMargins(
-    8,
-    10,
-    8,
-    8
-);
+    simulation_group_layout->setContentsMargins(
+        8,
+        10,
+        8,
+        8
+    );
 
-simulation_group_layout->setSpacing(0);
+    simulation_group_layout->setSpacing(0);
 
-auto* simulation_scroll_area = new QScrollArea{
-    simulation_group
-};
+    auto *simulation_scroll_area = new QScrollArea{
+        simulation_group
+    };
 
-simulation_scroll_area->setWidgetResizable(true);
+    simulation_scroll_area->setWidgetResizable(true);
 
-simulation_scroll_area->setFrameShape(
-    QFrame::NoFrame
-);
+    simulation_scroll_area->setFrameShape(
+        QFrame::NoFrame
+    );
 
-simulation_scroll_area->setHorizontalScrollBarPolicy(
-    Qt::ScrollBarAlwaysOff
-);
+    simulation_scroll_area->setHorizontalScrollBarPolicy(
+        Qt::ScrollBarAlwaysOff
+    );
 
-simulation_scroll_area->setVerticalScrollBarPolicy(
-    Qt::ScrollBarAsNeeded
-);
+    simulation_scroll_area->setVerticalScrollBarPolicy(
+        Qt::ScrollBarAsNeeded
+    );
 
-auto* simulation_content = new QWidget{
-    simulation_scroll_area
-};
+    auto *simulation_content = new QWidget{
+        simulation_scroll_area
+    };
 
-auto* simulation_form = new QFormLayout{
-    simulation_content
-};
+    auto *simulation_form = new QFormLayout{
+        simulation_content
+    };
 
-simulation_form->setContentsMargins(
-    4,
-    2,
-    8,
-    2
-);
+    simulation_form->setContentsMargins(
+        4,
+        2,
+        8,
+        2
+    );
 
-simulation_form->setHorizontalSpacing(10);
+    simulation_form->setHorizontalSpacing(10);
 
-simulation_form->setVerticalSpacing(7);
+    simulation_form->setVerticalSpacing(7);
 
-dt_spin_ = make_double_spin_box(
-    1.0e-8,
-    1.0,
-    0.001,
-    10,
-    1.0e-4
-);
+    dt_spin_ = make_double_spin_box(
+        1.0e-8,
+        1.0,
+        0.001,
+        10,
+        1.0e-4
+    );
 
-total_time_spin_ = make_double_spin_box(
-    1.0e-6,
-    1'000'000.0,
-    100.0,
-    6,
-    10.0
-);
+    total_time_spin_ = make_double_spin_box(
+        1.0e-6,
+        1'000'000.0,
+        100.0,
+        6,
+        10.0
+    );
 
-particles_spin_ = make_spin_box(
-    1,
-    10'000'000,
-    2'000,
-    1'000
-);
+    particles_spin_ = make_spin_box(
+        1,
+        10'000'000,
+        2'000,
+        1'000
+    );
 
-burn_in_spin_ = make_spin_box(
-    0,
-    2'000'000'000,
-    10'000,
-    1'000
-);
+    burn_in_spin_ = make_spin_box(
+        0,
+        2'000'000'000,
+        10'000,
+        1'000
+    );
 
-x0_spin_ = make_double_spin_box(
-    -1.0e6,
-    1.0e6,
-    0.0,
-    8,
-    0.01
-);
+    x0_spin_ = make_double_spin_box(
+        -1.0e6,
+        1.0e6,
+        0.0,
+        8,
+        0.01
+    );
 
-x0_spin_->setToolTip(
-    "Initial coordinate x₀ used for every "
-    "particle of the ensemble at t = 0."
-);
+    x0_spin_->setToolTip(
+        "Initial coordinate x₀ used for every "
+        "particle of the ensemble at t = 0."
+    );
 
-seed_spin_ = make_spin_box(
-    0,
-    2'147'483'647,
-    42
-);
+    seed_spin_ = make_spin_box(
+        0,
+        2'147'483'647,
+        42
+    );
 
-const std::size_t hardware_threads =
-    std::max(
-        std::size_t{1},
-        static_cast<std::size_t>(
-            std::thread::hardware_concurrency()
+    const std::size_t hardware_threads =
+            std::max(
+                std::size_t{1},
+                static_cast<std::size_t>(
+                    std::thread::hardware_concurrency()
+                )
+            );
+
+    workers_spin_ = make_spin_box(
+        0,
+        static_cast<int>(hardware_threads),
+        0
+    );
+
+    workers_spin_->setSpecialValueText(
+        QString{
+            "Auto (%1)"
+        }.arg(
+            static_cast<qulonglong>(
+                hardware_threads
+            )
         )
     );
 
-workers_spin_ = make_spin_box(
-    0,
-    static_cast<int>(hardware_threads),
-    0
-);
+    mode_combo_ = new QComboBox{
+        simulation_content
+    };
 
-workers_spin_->setSpecialValueText(
-    QString{
-        "Auto (%1)"
-    }.arg(
-        static_cast<qulonglong>(
-            hardware_threads
-        )
-    )
-);
+    mode_combo_->addItem(
+        "Fast: final result only",
+        false
+    );
 
-mode_combo_ = new QComboBox{
-    simulation_content
-};
+    mode_combo_->addItem(
+        "Interactive: progress and live data",
+        true
+    );
 
-mode_combo_->addItem(
-    "Fast: final result only",
-    false
-);
-
-mode_combo_->addItem(
-    "Interactive: progress and live data",
-    true
-);
-
-mode_combo_->setToolTip(
-    "Fast mode avoids intermediate ensemble reductions. "
-    "Interactive mode calculates in batches and provides "
-    "real progress updates."
-);
+    mode_combo_->setToolTip(
+        "Fast mode avoids intermediate ensemble reductions. "
+        "Interactive mode calculates in batches and provides "
+        "real progress updates."
+    );
 
     lookup_table_check_ = new QCheckBox(
         "Approximate periodic force",
@@ -1228,62 +1319,62 @@ mode_combo_->setToolTip(
         "an interpolation error."
     );
 
-simulation_form->addRow(
-    "Mode",
-    mode_combo_
-);
+    simulation_form->addRow(
+        "Mode",
+        mode_combo_
+    );
 
     simulation_form->addRow(
         "Force evaluation",
         lookup_table_check_
     );
 
-simulation_form->addRow(
-    "dt",
-    dt_spin_
-);
+    simulation_form->addRow(
+        "dt",
+        dt_spin_
+    );
 
-simulation_form->addRow(
-    "Total time",
-    total_time_spin_
-);
+    simulation_form->addRow(
+        "Total time",
+        total_time_spin_
+    );
 
-simulation_form->addRow(
-    "Particles",
-    particles_spin_
-);
+    simulation_form->addRow(
+        "Particles",
+        particles_spin_
+    );
 
-simulation_form->addRow(
-    "Burn-in steps",
-    burn_in_spin_
-);
+    simulation_form->addRow(
+        "Burn-in steps",
+        burn_in_spin_
+    );
 
-simulation_form->addRow(
-    "Initial position x₀",
-    x0_spin_
-);
+    simulation_form->addRow(
+        "Initial position x₀",
+        x0_spin_
+    );
 
-simulation_form->addRow(
-    "Seed",
-    seed_spin_
-);
+    simulation_form->addRow(
+        "Seed",
+        seed_spin_
+    );
 
-simulation_form->addRow(
-    "Workers",
-    workers_spin_
-);
+    simulation_form->addRow(
+        "Workers",
+        workers_spin_
+    );
 
-simulation_scroll_area->setWidget(
-    simulation_content
-);
+    simulation_scroll_area->setWidget(
+        simulation_content
+    );
 
-simulation_group_layout->addWidget(
-    simulation_scroll_area
-);
+    simulation_group_layout->addWidget(
+        simulation_scroll_area
+    );
 
-parameters_layout->addWidget(
-    simulation_group, 1
-);
+    parameters_layout->addWidget(
+        simulation_group, 1
+    );
 
     constexpr int parameter_group_height = 300;
 
@@ -1299,7 +1390,7 @@ parameters_layout->addWidget(
         parameter_group_height
     );
 
-    auto* controls_layout = new QHBoxLayout;
+    auto *controls_layout = new QHBoxLayout;
 
     run_button_ = new QPushButton{"Run simulation"};
     cancel_button_ = new QPushButton{"Cancel"};
@@ -1362,8 +1453,8 @@ parameters_layout->addWidget(
         controls_layout
     );
 
-    auto* results_group = new QGroupBox{"Result"};
-    auto* results_layout = new QGridLayout{results_group};
+    auto *results_group = new QGroupBox{"Result"};
+    auto *results_layout = new QGridLayout{results_group};
 
     velocity_value_label_ = make_result_label();
     final_x_value_label_ = make_result_label();
@@ -1372,10 +1463,22 @@ parameters_layout->addWidget(
     workers_value_label_ = make_result_label();
 
     results_layout->addWidget(
-        new QLabel{"Mean velocity:"}, 0, 0
+        new QLabel(
+            QStringLiteral(
+                "Velocity (CV \u00B1 SE)"
+            )
+        ),
+        0,
+        0
     );
     results_layout->addWidget(
         velocity_value_label_, 0, 1
+    );
+
+    velocity_value_label_->setToolTip(
+        "Control-variate estimate of the mean velocity "
+        "plus/minus one standard error (SE). "
+        "This is not a 95% confidence interval."
     );
 
     results_layout->addWidget(
@@ -1408,13 +1511,13 @@ parameters_layout->addWidget(
 
     root_layout->addWidget(results_group);
 
-    auto* log_group = new QGroupBox(
-    "Log",
-    central_widget
-);
+    auto *log_group = new QGroupBox(
+        "Log",
+        central_widget
+    );
 
-    auto* log_layout =
-        new QVBoxLayout(log_group);
+    auto *log_layout =
+            new QVBoxLayout(log_group);
 
     log_layout->setContentsMargins(
         8, 12, 8, 8
@@ -1436,7 +1539,7 @@ parameters_layout->addWidget(
     );
 
     // Нижняя строка с кнопкой справа.
-    auto* log_toolbar = new QHBoxLayout;
+    auto *log_toolbar = new QHBoxLayout;
 
     log_toolbar->setContentsMargins(
         0, 0, 0, 0
@@ -1444,7 +1547,7 @@ parameters_layout->addWidget(
 
     log_toolbar->addStretch(1);
 
-    auto* clear_log_button = new QPushButton(
+    auto *clear_log_button = new QPushButton(
         "Clear",
         log_group
     );
@@ -1479,19 +1582,19 @@ parameters_layout->addWidget(
 
 
     QTimer::singleShot(
-    0,
-    this,
-    [this] {
-        if (
-            simulation_group_ &&
-            status_label_
-        ) {
-            status_label_->setFixedWidth(
-                simulation_group_->width()
-            );
+        0,
+        this,
+        [this] {
+            if (
+                simulation_group_ &&
+                status_label_
+            ) {
+                status_label_->setFixedWidth(
+                    simulation_group_->width()
+                );
+            }
         }
-    }
-);
+    );
 }
 
 void MainWindow::connect_controls_() {
@@ -1514,12 +1617,12 @@ void MainWindow::connect_controls_() {
     );
 
     connect(
-    show_graph_button_,
-    &QPushButton::clicked,
-    this,
-    [this] {
-        show_trajectory_window_();
-    }
+        show_graph_button_,
+        &QPushButton::clicked,
+        this,
+        [this] {
+            show_trajectory_window_();
+        }
     );
 
     connect(
@@ -1534,26 +1637,26 @@ void MainWindow::connect_controls_() {
     );
 
     connect(
-    open_potential_button_,
-    &QPushButton::clicked,
-    this,
-    [this] {
-        const QString file_name =
-            QFileDialog::getOpenFileName(
-                this,
-                "Open potential configuration",
-                QDir::homePath(),
-                "Potential configuration "
-                "(*.bmpotential *.json)"
-            );
+        open_potential_button_,
+        &QPushButton::clicked,
+        this,
+        [this] {
+            const QString file_name =
+                    QFileDialog::getOpenFileName(
+                        this,
+                        "Open potential configuration",
+                        QDir::homePath(),
+                        "Potential configuration "
+                        "(*.bmpotential *.json)"
+                    );
 
-        if (!file_name.isEmpty()) {
-            load_potential_file_(
-                file_name
-            );
+            if (!file_name.isEmpty()) {
+                load_potential_file_(
+                    file_name
+                );
+            }
         }
-    }
-);
+    );
 
     connect(
         builtin_potential_button_,
@@ -1568,39 +1671,38 @@ void MainWindow::connect_controls_() {
         potential_drop_area_,
         &PotentialDropArea::file_dropped,
         this,
-        [this](const QString& file_name) {
+        [this](const QString &file_name) {
             load_potential_file_(
                 file_name
             );
         }
     );
-
 }
 
 SimulationRequest MainWindow::request_from_controls_() const {
     const bool interactive_mode =
-        mode_combo_->currentData().toBool();
+            mode_combo_->currentData().toBool();
 
     return SimulationRequest{
         .v1 =
-            active_potential_definition_
-                ? 0.0
-                : potential_parameter_spins_
-                      .value("V1")
-                      ->value(),
+        active_potential_definition_
+            ? 0.0
+            : potential_parameter_spins_
+            .value("V1")
+            ->value(),
 
         .v2 =
-            active_potential_definition_
-                ? 0.0
-                : potential_parameter_spins_
-                      .value("V2")
-                      ->value(),
+        active_potential_definition_
+            ? 0.0
+            : potential_parameter_spins_
+            .value("V2")
+            ->value(),
 
         .potential_definition =
-            active_potential_definition_,
+        active_potential_definition_,
 
         .potential_parameter_values =
-            potential_values_from_controls_(),
+        potential_values_from_controls_(),
 
         .dt = dt_spin_->value(),
         .total_time = total_time_spin_->value(),
@@ -1628,7 +1730,7 @@ SimulationRequest MainWindow::request_from_controls_() const {
         .interactive_mode = interactive_mode,
 
         .use_lookup_table =
-            lookup_table_check_->isChecked(),
+        lookup_table_check_->isChecked(),
 
         .lookup_intervals = 16'384,
 
@@ -1637,8 +1739,8 @@ SimulationRequest MainWindow::request_from_controls_() const {
 }
 
 bool MainWindow::validate_request_(
-    const SimulationRequest& request,
-    QString& error_message
+    const SimulationRequest &request,
+    QString &error_message
 ) const {
     if (request.dt <= 0.0) {
         error_message = "dt must be greater than zero.";
@@ -1651,38 +1753,38 @@ bool MainWindow::validate_request_(
     }
 
     const std::size_t total_steps =
-        static_cast<std::size_t>(
-            request.total_time / request.dt
-        );
+            static_cast<std::size_t>(
+                request.total_time / request.dt
+            );
 
     if (total_steps == 0) {
         error_message =
-            "Total time / dt must produce at least one physical step.";
+                "Total time / dt must produce at least one physical step.";
         return false;
     }
 
     if (request.burn_in_steps >= total_steps) {
         error_message = QString{
-            "Burn-in steps (%1) must be smaller than the "
-            "total number of physical steps (%2)."
-        }
-            .arg(
-                static_cast<qulonglong>(
-                    request.burn_in_steps
+                    "Burn-in steps (%1) must be smaller than the "
+                    "total number of physical steps (%2)."
+                }
+                .arg(
+                    static_cast<qulonglong>(
+                        request.burn_in_steps
+                    )
                 )
-            )
-            .arg(
-                static_cast<qulonglong>(
-                    total_steps
-                )
-            );
+                .arg(
+                    static_cast<qulonglong>(
+                        total_steps
+                    )
+                );
 
         return false;
     }
 
     try {
         request.modulation.validate();
-    } catch (const std::exception& exception) {
+    } catch (const std::exception &exception) {
         error_message = QString::fromUtf8(
             exception.what()
         );
@@ -1704,11 +1806,11 @@ void MainWindow::update_elapsed_time_() {
 
     elapsed_live_label_->setText(
         QStringLiteral("Elapsed: %1")
-            .arg(
-                format_elapsed_time(
-                    elapsed_clock_.elapsed()
-                )
+        .arg(
+            format_elapsed_time(
+                elapsed_clock_.elapsed()
             )
+        )
     );
 }
 
@@ -1718,9 +1820,9 @@ void MainWindow::start_simulation_() {
     }
 
     if (
-    potential_state_ !=
+        potential_state_ !=
         PotentialState::Ready
-    ){
+    ) {
         append_log_(
             "Simulation blocked: select a valid "
             "potential or use the built-in profile."
@@ -1730,7 +1832,7 @@ void MainWindow::start_simulation_() {
     }
 
     const SimulationRequest request =
-        request_from_controls_();
+            request_from_controls_();
 
     QString validation_error;
 
@@ -1743,7 +1845,7 @@ void MainWindow::start_simulation_() {
 
         append_log_(
             QString{"Start rejected: %1"}
-                .arg(validation_error)
+            .arg(validation_error)
         );
 
         return;
@@ -1757,16 +1859,16 @@ void MainWindow::start_simulation_() {
             };
 
             const auto derivative_error =
-                check_potential_derivative(
-                    *request.potential_definition,
-                    evaluator
-                );
+                    check_potential_derivative(
+                        *request.potential_definition,
+                        evaluator
+                    );
 
             if (derivative_error) {
                 const QString message =
-                    QString::fromStdString(
-                        *derivative_error
-                    );
+                        QString::fromStdString(
+                            *derivative_error
+                        );
 
                 append_log_(
                     QString{
@@ -1783,12 +1885,12 @@ void MainWindow::start_simulation_() {
                 return;
             }
         } catch (
-            const std::exception& exception
+            const std::exception &exception
         ) {
             const QString message =
-                QString::fromUtf8(
-                    exception.what()
-                );
+                    QString::fromUtf8(
+                        exception.what()
+                    );
 
             append_log_(
                 QString{
@@ -1807,15 +1909,15 @@ void MainWindow::start_simulation_() {
     }
 
     const std::size_t total_steps =
-        static_cast<std::size_t>(
-            request.total_time / request.dt
-        );
+            static_cast<std::size_t>(
+                request.total_time / request.dt
+            );
 
     const std::size_t total_updates =
-        request.n_particles * total_steps;
+            request.n_particles * total_steps;
 
     cancellation_source_ =
-        std::make_shared<std::stop_source>();
+            std::make_shared<std::stop_source>();
 
     simulation_completed_ = false;
     trajectory_dt_ = request.dt;
@@ -1823,7 +1925,7 @@ void MainWindow::start_simulation_() {
     if (request.interactive_mode) {
         trajectory_plot_->clear_points();
         burn_in_info_label_->setText(
-        "Burn-in: available after simulation completes/upon accumulating 40 points"
+            "Burn-in: available after simulation completes/upon accumulating 40 points"
         );
 
         trend_info_label_->setText(
@@ -1866,22 +1968,68 @@ void MainWindow::start_simulation_() {
         cancellation_source_
     };
 
-        connect(
+    connect(
         simulation_worker_,
         &SimulationWorker::statistics_ready,
         this,
         [this](
-            const QJsonObject& statistics
-        ) {
+    const QJsonObject &statistics
+) {
             log_experiment_event_(
                 "simulation_statistics",
                 statistics
             );
 
+            // Не подменяем отсутствующую CV-оценку
+            // обычной скоростью.
+            velocity_value_label_->setText(
+                QStringLiteral("--")
+            );
+
+            if (
+                statistics
+                .value("control_variate_available")
+                .toBool()
+            ) {
+                const QJsonValue velocity_json =
+                        statistics.value(
+                            "control_variate_velocity"
+                        );
+
+                const QJsonValue error_json =
+                        statistics.value(
+                            "control_variate_standard_error"
+                        );
+
+                if (
+                    velocity_json.isDouble() &&
+                    error_json.isDouble()
+                ) {
+                    const double velocity =
+                            velocity_json.toDouble();
+
+                    const double standard_error =
+                            error_json.toDouble();
+
+                    if (
+                        std::isfinite(velocity) &&
+                        std::isfinite(standard_error) &&
+                        standard_error >= 0.0
+                    ) {
+                        velocity_value_label_->setText(
+                            format_velocity_with_se(
+                                velocity,
+                                standard_error
+                            )
+                        );
+                    }
+                }
+            }
+
             if (
                 !statistics
-                    .value("available")
-                    .toBool()
+                .value("available")
+                .toBool()
             ) {
                 append_log_(
                     "Velocity statistics unavailable: "
@@ -1893,27 +2041,27 @@ void MainWindow::start_simulation_() {
             }
 
             const double velocity =
-                statistics
+                    statistics
                     .value("mean_velocity")
                     .toDouble();
 
             const double standard_error =
-                statistics
+                    statistics
                     .value("velocity_standard_error")
                     .toDouble();
 
             const double lower =
-                statistics
+                    statistics
                     .value("velocity_ci95_lower")
                     .toDouble();
 
             const double upper =
-                statistics
+                    statistics
                     .value("velocity_ci95_upper")
                     .toDouble();
 
             const bool contains_zero =
-                statistics
+                    statistics
                     .value("ci95_contains_zero")
                     .toBool();
 
@@ -1924,15 +2072,15 @@ void MainWindow::start_simulation_() {
                     "approx. 95% CI = [%3, %4]; "
                     "zero in CI = %5"
                 )
-                    .arg(velocity, 0, 'e', 8)
-                    .arg(standard_error, 0, 'e', 8)
-                    .arg(lower, 0, 'e', 8)
-                    .arg(upper, 0, 'e', 8)
-                    .arg(
-                        contains_zero
-                            ? QStringLiteral("yes")
-                            : QStringLiteral("no")
-                    )
+                .arg(velocity, 0, 'e', 8)
+                .arg(standard_error, 0, 'e', 8)
+                .arg(lower, 0, 'e', 8)
+                .arg(upper, 0, 'e', 8)
+                .arg(
+                    contains_zero
+                        ? QStringLiteral("yes")
+                        : QStringLiteral("no")
+                )
             );
 
             append_log_(
@@ -1943,61 +2091,61 @@ void MainWindow::start_simulation_() {
                     "sample variance = %3; "
                     "mean square = %4"
                 )
-                    .arg(
-                        statistics
-                            .value("measurement_time")
-                            .toDouble(),
-                        0, 'g', 10
-                    )
-                    .arg(
-                        statistics
-                            .value("mean_displacement")
-                            .toDouble(),
-                        0, 'e', 8
-                    )
-                    .arg(
-                        statistics
-                            .value("displacement_variance")
-                            .toDouble(),
-                        0, 'e', 8
-                    )
-                    .arg(
-                        statistics
-                            .value("mean_squared_displacement")
-                            .toDouble(),
-                        0, 'e', 8
-                    )
+                .arg(
+                    statistics
+                    .value("measurement_time")
+                    .toDouble(),
+                    0, 'g', 10
+                )
+                .arg(
+                    statistics
+                    .value("mean_displacement")
+                    .toDouble(),
+                    0, 'e', 8
+                )
+                .arg(
+                    statistics
+                    .value("displacement_variance")
+                    .toDouble(),
+                    0, 'e', 8
+                )
+                .arg(
+                    statistics
+                    .value("mean_squared_displacement")
+                    .toDouble(),
+                    0, 'e', 8
+                )
             );
 
             if (
                 statistics
-                    .value("control_variate_available")
-                    .toBool()
+                .value("control_variate_available")
+                .toBool()
             ) {
                 const double cv_velocity =
-                    statistics
+                        statistics
                         .value("control_variate_velocity")
                         .toDouble();
 
                 const double cv_error =
-                    statistics
+                        statistics
                         .value(
                             "control_variate_standard_error"
                         )
                         .toDouble();
 
                 const double cv_lower =
-                    statistics
+                        statistics
                         .value("control_variate_ci95_lower")
                         .toDouble();
 
                 const double cv_upper =
-                    statistics
+                        statistics
                         .value("control_variate_ci95_upper")
                         .toDouble();
 
                 const bool cv_contains_zero =
-                    statistics
+                        statistics
                         .value(
                             "control_variate_ci95_contains_zero"
                         )
@@ -2010,15 +2158,15 @@ void MainWindow::start_simulation_() {
                         "approx. 95% CI = [%3, %4]; "
                         "zero in CI = %5"
                     )
-                        .arg(cv_velocity, 0, 'e', 8)
-                        .arg(cv_error, 0, 'e', 8)
-                        .arg(cv_lower, 0, 'e', 8)
-                        .arg(cv_upper, 0, 'e', 8)
-                        .arg(
-                            cv_contains_zero
-                                ? QStringLiteral("yes")
-                                : QStringLiteral("no")
-                        )
+                    .arg(cv_velocity, 0, 'e', 8)
+                    .arg(cv_error, 0, 'e', 8)
+                    .arg(cv_lower, 0, 'e', 8)
+                    .arg(cv_upper, 0, 'e', 8)
+                    .arg(
+                        cv_contains_zero
+                            ? QStringLiteral("yes")
+                            : QStringLiteral("no")
+                    )
                 );
 
                 append_log_(
@@ -2027,8 +2175,8 @@ void MainWindow::start_simulation_() {
                         "to raw velocity: %1"
                     ).arg(
                         statistics
-                            .value("mean_thermal_velocity")
-                            .toDouble(),
+                        .value("mean_thermal_velocity")
+                        .toDouble(),
                         0,
                         'e',
                         8
@@ -2040,20 +2188,20 @@ void MainWindow::start_simulation_() {
     );
 
     connect(
-    simulation_worker_,
-    &SimulationWorker::profile_prepared,
-    this,
-    [this](
-        const QString& backend,
-        qulonglong intervals,
-        double preparation_seconds
-    ) {
-        append_log_(
-            QString(
-                "Force backend: %1; "
-                "lookup intervals: %2; "
-                "profile preparation: %3 s"
-            )
+        simulation_worker_,
+        &SimulationWorker::profile_prepared,
+        this,
+        [this](
+    const QString &backend,
+    qulonglong intervals,
+    double preparation_seconds
+) {
+            append_log_(
+                QString(
+                    "Force backend: %1; "
+                    "lookup intervals: %2; "
+                    "profile preparation: %3 s"
+                )
                 .arg(backend)
                 .arg(intervals)
                 .arg(
@@ -2062,30 +2210,30 @@ void MainWindow::start_simulation_() {
                     'f',
                     6
                 )
-        );
+            );
 
-        log_experiment_event_(
-            "potential_backend_prepared",
-            QJsonObject{
-                {
-                    "backend",
-                    backend
-                },
-                {
-                    "lookup_intervals",
-                    static_cast<qint64>(
-                        intervals
-                    )
-                },
-                {
-                    "preparation_seconds",
-                    preparation_seconds
+            log_experiment_event_(
+                "potential_backend_prepared",
+                QJsonObject{
+                    {
+                        "backend",
+                        backend
+                    },
+                    {
+                        "lookup_intervals",
+                        static_cast<qint64>(
+                            intervals
+                        )
+                    },
+                    {
+                        "preparation_seconds",
+                        preparation_seconds
+                    }
                 }
-            }
-        );
-    },
-    Qt::QueuedConnection
-);
+            );
+        },
+        Qt::QueuedConnection
+    );
 
     simulation_worker_->moveToThread(
         simulation_thread_
@@ -2103,24 +2251,24 @@ void MainWindow::start_simulation_() {
         &SimulationWorker::progress_updated,
         this,
         [this](
-            qulonglong completed_steps,
-            qulonglong total_steps_value,
-            double time,
-            double mean_x,
-            double mean_velocity
-        ) {
+    qulonglong completed_steps,
+    qulonglong total_steps_value,
+    double time,
+    double mean_x,
+    double mean_velocity
+) {
             if (total_steps_value == 0) {
                 return;
             }
 
             const double fraction =
-                static_cast<double>(completed_steps) /
-                static_cast<double>(total_steps_value);
+                    static_cast<double>(completed_steps) /
+                    static_cast<double>(total_steps_value);
 
             const int progress_percent =
-                static_cast<int>(
-                    std::lround(100.0 * fraction)
-                );
+                    static_cast<int>(
+                        std::lround(100.0 * fraction)
+                    );
 
             progress_bar_->setRange(0, 100);
             progress_bar_->setValue(
@@ -2131,13 +2279,13 @@ void MainWindow::start_simulation_() {
                 QString(
                     "Running: %1% | t = %2"
                 )
-                    .arg(progress_percent)
-                    .arg(
-                        time,
-                        0,
-                        'g',
-                        6
-                    )
+                .arg(progress_percent)
+                .arg(
+                    time,
+                    0,
+                    'g',
+                    6
+                )
             );
 
             trajectory_plot_->append_point(
@@ -2153,22 +2301,22 @@ void MainWindow::start_simulation_() {
         &SimulationWorker::completed,
         this,
         [this, request](
-            double mean_velocity,
-            double mean_x_final,
-            double elapsed_seconds,
-            double throughput,
-            std::size_t workers
-        ) {
+    double mean_velocity,
+    double mean_x_final,
+    double elapsed_seconds,
+    double throughput,
+    std::size_t workers
+) {
             elapsed_timer_.stop();
 
             const QString elapsed_text =
-                format_elapsed_seconds(
-                    elapsed_seconds
-                );
+                    format_elapsed_seconds(
+                        elapsed_seconds
+                    );
 
             elapsed_live_label_->setText(
                 QStringLiteral("Elapsed: %1")
-                    .arg(elapsed_text)
+                .arg(elapsed_text)
             );
 
             elapsed_value_label_->setText(
@@ -2178,14 +2326,6 @@ void MainWindow::start_simulation_() {
             progress_bar_->setRange(0, 100);
             progress_bar_->setValue(100);
             progress_bar_->setVisible(false);
-
-            velocity_value_label_->setText(
-                QString::number(
-                    mean_velocity,
-                    'e',
-                    12
-                )
-            );
 
             final_x_value_label_->setText(
                 QString::number(
@@ -2197,7 +2337,7 @@ void MainWindow::start_simulation_() {
 
             throughput_value_label_->setText(
                 QString{"%1 M updates/s"}
-                    .arg(throughput, 0, 'f', 3)
+                .arg(throughput, 0, 'f', 3)
             );
 
             workers_value_label_->setText(
@@ -2207,11 +2347,11 @@ void MainWindow::start_simulation_() {
             );
 
             const bool was_cancelled =
-                cancellation_source_ &&
-                cancellation_source_->stop_requested();
+                    cancellation_source_ &&
+                    cancellation_source_->stop_requested();
 
             simulation_completed_ =
-                request.interactive_mode;
+                    request.interactive_mode;
 
             status_label_->setText(
                 was_cancelled
@@ -2220,106 +2360,106 @@ void MainWindow::start_simulation_() {
             );
 
             append_log_(
-    QString(
-        "Completed: velocity = %1, "
-        "<x_final> = %2, "
-        "time = %3, "
-        "throughput = %4 M updates/s"
-    )
-        .arg(
-            mean_velocity,
-            0,
-            'e',
-            12
-        )
-        .arg(
-            mean_x_final,
-            0,
-            'e',
-            12
-        )
-        .arg(
-            elapsed_text
-        )
-        .arg(
-            throughput,
-            0,
-            'f',
-            3
-        )
-);
+                QString(
+                    "Completed: velocity = %1, "
+                    "<x_final> = %2, "
+                    "time = %3, "
+                    "throughput = %4 M updates/s"
+                )
+                .arg(
+                    mean_velocity,
+                    0,
+                    'e',
+                    12
+                )
+                .arg(
+                    mean_x_final,
+                    0,
+                    'e',
+                    12
+                )
+                .arg(
+                    elapsed_text
+                )
+                .arg(
+                    throughput,
+                    0,
+                    'f',
+                    3
+                )
+            );
 
             log_experiment_event_(
-    was_cancelled
-        ? "simulation_cancelled"
-        : "simulation_completed",
-    QJsonObject{
-        {
-            "mode",
-            request.interactive_mode
-                ? "interactive"
-                : "fast"
-        },
-        {
-            "status",
-            was_cancelled
-                ? "cancelled_partial_result"
-                : "completed"
-        },
-        {
-            "mean_velocity",
-            mean_velocity
-        },
-        {
-            "mean_x_final",
-            mean_x_final
-        },
-        {
-            "elapsed_seconds",
-            elapsed_seconds
-        },
-        {
-            "throughput_million_updates_per_second",
-            throughput
-        },
-        {
-            "workers_used",
-            static_cast<qint64>(workers)
-        },
-        {
-            "particles",
-            static_cast<qint64>(request.n_particles)
-        },
-        {
-            "dt",
-            request.dt
-        },
-        {
-            "total_time_requested",
-            request.total_time
-        },
-        {
-            "burn_in_steps",
-            static_cast<qint64>(
-                request.burn_in_steps
-            )
-        },
-        {
-            "trajectory_points",
-            request.interactive_mode
-                ? static_cast<qint64>(
-                    trajectory_plot_->point_count()
-                )
-                : QJsonValue{0}
-        }
-    }
-);
+                was_cancelled
+                    ? "simulation_cancelled"
+                    : "simulation_completed",
+                QJsonObject{
+                    {
+                        "mode",
+                        request.interactive_mode
+                            ? "interactive"
+                            : "fast"
+                    },
+                    {
+                        "status",
+                        was_cancelled
+                            ? "cancelled_partial_result"
+                            : "completed"
+                    },
+                    {
+                        "mean_velocity",
+                        mean_velocity
+                    },
+                    {
+                        "mean_x_final",
+                        mean_x_final
+                    },
+                    {
+                        "elapsed_seconds",
+                        elapsed_seconds
+                    },
+                    {
+                        "throughput_million_updates_per_second",
+                        throughput
+                    },
+                    {
+                        "workers_used",
+                        static_cast<qint64>(workers)
+                    },
+                    {
+                        "particles",
+                        static_cast<qint64>(request.n_particles)
+                    },
+                    {
+                        "dt",
+                        request.dt
+                    },
+                    {
+                        "total_time_requested",
+                        request.total_time
+                    },
+                    {
+                        "burn_in_steps",
+                        static_cast<qint64>(
+                            request.burn_in_steps
+                        )
+                    },
+                    {
+                        "trajectory_points",
+                        request.interactive_mode
+                            ? static_cast<qint64>(
+                                trajectory_plot_->point_count()
+                            )
+                            : QJsonValue{0}
+                    }
+                }
+            );
 
             if (request.interactive_mode) {
                 trend_info_label_->setText(
                     was_cancelled
                         ? "Trend: partial trajectory, "
-                          "select a start point"
+                        "select a start point"
                         : "Trend: select a start point"
                 );
             } else {
@@ -2338,7 +2478,7 @@ void MainWindow::start_simulation_() {
         simulation_worker_,
         &SimulationWorker::failed,
         this,
-        [this, request](const QString& message) {
+        [this, request](const QString &message) {
             elapsed_timer_.stop();
 
             progress_bar_->setRange(0, 100);
@@ -2348,48 +2488,52 @@ void MainWindow::start_simulation_() {
             elapsed_live_label_->setText("Elapsed: —");
             status_label_->setText("Failed");
 
+            velocity_value_label_->setText(
+                QStringLiteral("--")
+            );
+
             append_log_(
                 QString{"Simulation failed: %1"}
-                    .arg(message)
+                .arg(message)
             );
 
             log_experiment_event_(
-    "simulation_failed",
-    QJsonObject{
-        {
-            "mode",
-            request.interactive_mode
-                ? "interactive"
-                : "fast"
-        },
-        {
-            "error",
-            message
-        },
-        {
-            "particles",
-            static_cast<qint64>(request.n_particles)
-        },
-        {
-            "dt",
-            request.dt
-        },
-        {
-            "total_time",
-            request.total_time
-        },
-        {
-            "burn_in_steps",
-            static_cast<qint64>(
-                request.burn_in_steps
-            )
-        },
-        {
-            "seed",
-            static_cast<qint64>(request.seed)
-        }
-    }
-);
+                "simulation_failed",
+                QJsonObject{
+                    {
+                        "mode",
+                        request.interactive_mode
+                            ? "interactive"
+                            : "fast"
+                    },
+                    {
+                        "error",
+                        message
+                    },
+                    {
+                        "particles",
+                        static_cast<qint64>(request.n_particles)
+                    },
+                    {
+                        "dt",
+                        request.dt
+                    },
+                    {
+                        "total_time",
+                        request.total_time
+                    },
+                    {
+                        "burn_in_steps",
+                        static_cast<qint64>(
+                            request.burn_in_steps
+                        )
+                    },
+                    {
+                        "seed",
+                        static_cast<qint64>(request.seed)
+                    }
+                }
+            );
 
             simulation_completed_ = false;
 
@@ -2397,7 +2541,7 @@ void MainWindow::start_simulation_() {
 
             trend_info_label_->setText(
                 "Trend: unavailable because "
-                  "the simulation failed"
+                "the simulation failed"
             );
 
             update_plot_tools_();
@@ -2462,28 +2606,28 @@ void MainWindow::start_simulation_() {
             "Run started: mode = %1, particles = %2, "
             "T = %3, dt = %4, seed = %5, workers = %6"
         }
-            .arg(
-                request.interactive_mode
-                    ? "interactive"
-                    : "fast"
+        .arg(
+            request.interactive_mode
+                ? "interactive"
+                : "fast"
+        )
+        .arg(
+            static_cast<qulonglong>(
+                request.n_particles
             )
-            .arg(
-                static_cast<qulonglong>(
-                    request.n_particles
-                )
-            )
-            .arg(request.total_time, 0, 'g', 12)
-            .arg(request.dt, 0, 'g', 12)
-            .arg(request.seed)
-            .arg(
-                request.requested_workers == 0
-                    ? QString{"auto"}
-                    : QString::number(
-                        static_cast<qulonglong>(
-                            request.requested_workers
-                        )
+        )
+        .arg(request.total_time, 0, 'g', 12)
+        .arg(request.dt, 0, 'g', 12)
+        .arg(request.seed)
+        .arg(
+            request.requested_workers == 0
+                ? QString{"auto"}
+                : QString::number(
+                    static_cast<qulonglong>(
+                        request.requested_workers
                     )
-            )
+                )
+        )
     );
 
     append_log_(
@@ -2491,23 +2635,23 @@ void MainWindow::start_simulation_() {
             "Work estimate: %1 physical steps, "
             "%2 particle updates."
         }
-            .arg(
-                static_cast<qulonglong>(
-                    total_steps
-                )
+        .arg(
+            static_cast<qulonglong>(
+                total_steps
             )
-            .arg(
-                static_cast<qulonglong>(
-                    total_updates
-                )
+        )
+        .arg(
+            static_cast<qulonglong>(
+                total_updates
             )
+        )
     );
 
 
     const QJsonObject modulation_log =
-        ModulationPanel::settings_json(
-            request.modulation
-        );
+            ModulationPanel::settings_json(
+                request.modulation
+            );
 
     append_log_(
         QString(
@@ -2524,90 +2668,90 @@ void MainWindow::start_simulation_() {
     );
 
     log_experiment_event_(
-    "simulation_started",
-    QJsonObject{
-        {
-            "mode",
-            request.interactive_mode
-                ? "interactive"
-                : "fast"
-        },
-        {
-            "modulation",
-            modulation_log
-        },
-        {
-            "v1",
-            request.v1
-        },
-        {
-            "v2",
-            request.v2
-        },
-        {
-            "dt",
-            request.dt
-        },
-        {
-            "total_time",
-            request.total_time
-        },
-        {
-            "x0",
-            request.x0
-        },
-        {
-            "total_steps",
-            static_cast<qint64>(total_steps)
-        },
-        {
-            "particles",
-            static_cast<qint64>(request.n_particles)
-        },
-        {
-            "burn_in_steps",
-            static_cast<qint64>(
-                request.burn_in_steps
-            )
-        },
-        {
-            "seed",
-            static_cast<qint64>(request.seed)
-        },
-        {
-            "requested_workers",
-            request.requested_workers == 0
-                ? QJsonValue{"auto"}
-                : QJsonValue{
-                    static_cast<qint64>(
-                        request.requested_workers
-                    )
-                }
-        },
-        {
-            "batch_steps",
-            static_cast<qint64>(request.batch_steps)
-        },
-        {
-            "cancellation_check_steps",
-            static_cast<qint64>(
-                request.cancellation_check_steps
-            )
-        },
-        {
-            "use_lookup_table",
-                request.use_lookup_table
-        },
-        {
-            "lookup_intervals",
+        "simulation_started",
+        QJsonObject{
+            {
+                "mode",
+                request.interactive_mode
+                    ? "interactive"
+                    : "fast"
+            },
+            {
+                "modulation",
+                modulation_log
+            },
+            {
+                "v1",
+                request.v1
+            },
+            {
+                "v2",
+                request.v2
+            },
+            {
+                "dt",
+                request.dt
+            },
+            {
+                "total_time",
+                request.total_time
+            },
+            {
+                "x0",
+                request.x0
+            },
+            {
+                "total_steps",
+                static_cast<qint64>(total_steps)
+            },
+            {
+                "particles",
+                static_cast<qint64>(request.n_particles)
+            },
+            {
+                "burn_in_steps",
                 static_cast<qint64>(
+                    request.burn_in_steps
+                )
+            },
+            {
+                "seed",
+                static_cast<qint64>(request.seed)
+            },
+            {
+                "requested_workers",
+                request.requested_workers == 0
+                    ? QJsonValue{"auto"}
+                    : QJsonValue{
+                        static_cast<qint64>(
+                            request.requested_workers
+                        )
+                    }
+            },
+            {
+                "batch_steps",
+                static_cast<qint64>(request.batch_steps)
+            },
+            {
+                "cancellation_check_steps",
+                static_cast<qint64>(
+                    request.cancellation_check_steps
+                )
+            },
+            {
+                "use_lookup_table",
                 request.use_lookup_table
-                ? request.lookup_intervals
-                : 0
+            },
+            {
+                "lookup_intervals",
+                static_cast<qint64>(
+                    request.use_lookup_table
+                        ? request.lookup_intervals
+                        : 0
                 )
             }
-    }
-);
+        }
+    );
 
     set_running_state_(true);
 
@@ -2649,24 +2793,24 @@ void MainWindow::cancel_simulation_() {
     );
 
     log_experiment_event_(
-    "cancellation_requested",
-    QJsonObject{
-        {
-            "mode",
-            mode_combo_->currentData().toBool()
-                ? "interactive"
-                : "fast"
-        },
-        {
-            "elapsed_seconds",
-            elapsed_clock_.isValid()
-                ? static_cast<double>(
-                    elapsed_clock_.elapsed()
-                ) / 1000.0
-                : 0.0
+        "cancellation_requested",
+        QJsonObject{
+            {
+                "mode",
+                mode_combo_->currentData().toBool()
+                    ? "interactive"
+                    : "fast"
+            },
+            {
+                "elapsed_seconds",
+                elapsed_clock_.isValid()
+                    ? static_cast<double>(
+                          elapsed_clock_.elapsed()
+                      ) / 1000.0
+                    : 0.0
+            }
         }
-    }
-);
+    );
 }
 
 void MainWindow::show_trajectory_window_() {
@@ -2710,8 +2854,8 @@ void MainWindow::validate_burn_in_() {
     }
 
     trajectory_plot_->validate_burn_in(
-    trajectory_dt_,
-    burn_in_tolerance_spin_->value() / 100.0
+        trajectory_dt_,
+        burn_in_tolerance_spin_->value() / 100.0
     );
 }
 
@@ -2732,13 +2876,13 @@ void MainWindow::export_trajectory_() {
     }
 
     const QString csv_filter =
-        "CSV data (*.csv)";
+            "CSV data (*.csv)";
 
     const QString png_filter =
-        "PNG image (*.png)";
+            "PNG image (*.png)";
 
     const QString jpg_filter =
-        "JPEG image (*.jpg *.jpeg)";
+            "JPEG image (*.jpg *.jpeg)";
 
     QString selected_filter = csv_filter;
 
@@ -2746,12 +2890,12 @@ void MainWindow::export_trajectory_() {
         trajectory_dialog_,
         "Export trajectory",
         QDir::homePath() +
-            "/mean_position_trajectory.csv",
+        "/mean_position_trajectory.csv",
         csv_filter +
-            ";;" +
-            png_filter +
-            ";;" +
-            jpg_filter,
+        ";;" +
+        png_filter +
+        ";;" +
+        jpg_filter,
         &selected_filter
     );
 
@@ -2761,11 +2905,11 @@ void MainWindow::export_trajectory_() {
 
     if (selected_filter == csv_filter) {
         if (!file_name.endsWith(
-                ".csv",
-                Qt::CaseInsensitive
-            )) {
+            ".csv",
+            Qt::CaseInsensitive
+        )) {
             file_name += ".csv";
-            }
+        }
 
         export_trajectory_csv_(file_name);
         return;
@@ -2773,11 +2917,11 @@ void MainWindow::export_trajectory_() {
 
     if (selected_filter == png_filter) {
         if (!file_name.endsWith(
-                ".png",
-                Qt::CaseInsensitive
-            )) {
+            ".png",
+            Qt::CaseInsensitive
+        )) {
             file_name += ".png";
-            }
+        }
 
         export_plot_image_(
             file_name,
@@ -2807,7 +2951,7 @@ void MainWindow::export_trajectory_() {
 }
 
 void MainWindow::export_trajectory_csv_(
-    const QString& file_name
+    const QString &file_name
 ) {
     QSaveFile file{file_name};
 
@@ -2838,10 +2982,10 @@ void MainWindow::export_trajectory_csv_(
     stream.setRealNumberPrecision(12);
 
     const std::vector<QPointF> points =
-        trajectory_plot_->points();
+            trajectory_plot_->points();
 
     const TrajectoryPlotWidget::LinearTrend trend =
-        trajectory_plot_->trend();
+            trajectory_plot_->trend();
 
     stream << "time;mean_x;trend_x;is_trend_region\n";
 
@@ -2850,18 +2994,18 @@ void MainWindow::export_trajectory_csv_(
         index < points.size();
         ++index
     ) {
-        const QPointF& point = points[index];
+        const QPointF &point = points[index];
 
         stream << point.x() << ';'
-               << point.y() << ';';
+                << point.y() << ';';
 
         if (
             trend.valid &&
             index >= trend.start_index
         ) {
             const double trend_x =
-                trend.intercept +
-                trend.slope * point.x();
+                    trend.intercept +
+                    trend.slope * point.x();
 
             stream << trend_x << ";1\n";
         } else {
@@ -2894,51 +3038,51 @@ void MainWindow::export_trajectory_csv_(
     );
 
     log_experiment_event_(
-    "trajectory_exported",
-    QJsonObject{
-        {
-            "format",
-            "csv"
-        },
-        {
-            "file_path",
-            QFileInfo{file_name}.absoluteFilePath()
-        },
-        {
-            "trajectory_points",
-            static_cast<qint64>(
-                trajectory_plot_->point_count()
-            )
-        },
-        {
-            "has_trend",
-            trajectory_plot_->has_trend()
-        },
-        {
-            "has_burn_in_validation",
-            trajectory_plot_->has_burn_in_validation()
+        "trajectory_exported",
+        QJsonObject{
+            {
+                "format",
+                "csv"
+            },
+            {
+                "file_path",
+                QFileInfo{file_name}.absoluteFilePath()
+            },
+            {
+                "trajectory_points",
+                static_cast<qint64>(
+                    trajectory_plot_->point_count()
+                )
+            },
+            {
+                "has_trend",
+                trajectory_plot_->has_trend()
+            },
+            {
+                "has_burn_in_validation",
+                trajectory_plot_->has_burn_in_validation()
+            }
         }
-    }
-);
+    );
 }
 
 void MainWindow::export_plot_image_(
-    const QString& file_name,
-    const QString& format
+    const QString &file_name,
+    const QString &format
 ) {
     const QPixmap plot_image =
-        trajectory_plot_->grab();
+            trajectory_plot_->grab();
 
     const int quality =
-        format == "JPG"
-            ? 95
-            : -1;
+            format == "JPG"
+                ? 95
+                : -1;
 
     if (!plot_image.save(
-            file_name,
-            format.toUtf8().constData(),
-            quality
-        )) {
+        file_name,
+        format.toUtf8().constData(),
+        quality
+    )) {
         QMessageBox::warning(
             trajectory_dialog_,
             QString{"Export %1"}.arg(format),
@@ -2952,7 +3096,7 @@ void MainWindow::export_plot_image_(
         );
 
         return;
-        }
+    }
 
     QMessageBox::information(
         trajectory_dialog_,
@@ -2967,33 +3111,32 @@ void MainWindow::export_plot_image_(
     );
 
     log_experiment_event_(
-    "plot_exported",
-    QJsonObject{
-        {
-            "format",
-            format.toLower()
-        },
-        {
-            "file_path",
-            QFileInfo{file_name}.absoluteFilePath()
-        },
-        {
-            "trajectory_points",
-            static_cast<qint64>(
-                trajectory_plot_->point_count()
-            )
-        },
-        {
-            "has_trend",
-            trajectory_plot_->has_trend()
-        },
-        {
-            "has_burn_in_validation",
-            trajectory_plot_->has_burn_in_validation()
+        "plot_exported",
+        QJsonObject{
+            {
+                "format",
+                format.toLower()
+            },
+            {
+                "file_path",
+                QFileInfo{file_name}.absoluteFilePath()
+            },
+            {
+                "trajectory_points",
+                static_cast<qint64>(
+                    trajectory_plot_->point_count()
+                )
+            },
+            {
+                "has_trend",
+                trajectory_plot_->has_trend()
+            },
+            {
+                "has_burn_in_validation",
+                trajectory_plot_->has_burn_in_validation()
+            }
         }
-    }
-);
-
+    );
 }
 
 void MainWindow::update_plot_tools_() {
@@ -3011,19 +3154,19 @@ void MainWindow::update_plot_tools_() {
     }
 
     const bool trend_is_available =
-        simulation_completed_ &&
-        trajectory_plot_->point_count() >= 3;
+            simulation_completed_ &&
+            trajectory_plot_->point_count() >= 3;
 
     const bool export_is_available =
-    simulation_completed_ &&
-    trajectory_plot_->point_count() > 0;
+            simulation_completed_ &&
+            trajectory_plot_->point_count() > 0;
 
     const bool burn_in_validation_is_available =
-    simulation_completed_ &&
-    trajectory_plot_->point_count() >= 40;
+            simulation_completed_ &&
+            trajectory_plot_->point_count() >= 40;
 
     burn_in_tolerance_spin_->setEnabled(
-    burn_in_validation_is_available
+        burn_in_validation_is_available
     );
 
     select_trend_button_->setEnabled(
@@ -3040,7 +3183,7 @@ void MainWindow::update_plot_tools_() {
     );
 
     highlight_trend_range_check_->setEnabled(
-    trajectory_plot_->has_trend()
+        trajectory_plot_->has_trend()
     );
 
     export_button_->setEnabled(
@@ -3048,7 +3191,7 @@ void MainWindow::update_plot_tools_() {
     );
 
     validate_burn_in_button_->setEnabled(
-    burn_in_validation_is_available
+        burn_in_validation_is_available
     );
 
     clear_burn_in_button_->setEnabled(
@@ -3058,11 +3201,11 @@ void MainWindow::update_plot_tools_() {
 
 void MainWindow::update_show_graph_button_() {
     const bool interactive_mode =
-        mode_combo_->currentData().toBool();
+            mode_combo_->currentData().toBool();
 
     const bool graph_is_hidden =
-        trajectory_dialog_ &&
-        !trajectory_dialog_->isVisible();
+            trajectory_dialog_ &&
+            !trajectory_dialog_->isVisible();
 
     show_graph_button_->setEnabled(
         interactive_mode &&
@@ -3071,19 +3214,18 @@ void MainWindow::update_show_graph_button_() {
 }
 
 bool MainWindow::eventFilter(
-    QObject* watched,
-    QEvent* event
+    QObject *watched,
+    QEvent *event
 ) {
-
     if (
-    watched == simulation_group_ &&
-    event->type() == QEvent::Resize &&
-    status_label_
-) {
+        watched == simulation_group_ &&
+        event->type() == QEvent::Resize &&
+        status_label_
+    ) {
         status_label_->setFixedWidth(
             simulation_group_->width()
         );
-}
+    }
 
     if (
         watched == trajectory_dialog_ &&
@@ -3133,7 +3275,7 @@ void MainWindow::set_running_state_(bool is_running) {
 }
 
 void MainWindow::append_log_(
-    const QString& message
+    const QString &message
 ) {
     log_output_->appendPlainText(message);
 }
@@ -3141,7 +3283,7 @@ void MainWindow::append_log_(
 void MainWindow::rebuild_potential_fields_(
     const std::vector<
         PotentialParameterDefinition
-    >& parameters
+    > &parameters
 ) {
     potential_parameter_spins_.clear();
 
@@ -3149,11 +3291,11 @@ void MainWindow::rebuild_potential_fields_(
         potential_parameters_form_->rowCount() > 0
     ) {
         potential_parameters_form_->
-            removeRow(0);
+                removeRow(0);
     }
 
-    for (const auto& parameter : parameters) {
-        auto* spin = make_double_spin_box(
+    for (const auto &parameter: parameters) {
+        auto *spin = make_double_spin_box(
             parameter.minimum,
             parameter.maximum,
             parameter.default_value,
@@ -3168,14 +3310,14 @@ void MainWindow::rebuild_potential_fields_(
         );
 
         const QString label =
-            QString::fromStdString(
-                parameter.label
-            );
+                QString::fromStdString(
+                    parameter.label
+                );
 
         const QString id =
-            QString::fromStdString(
-                parameter.id
-            );
+                QString::fromStdString(
+                    parameter.id
+                );
 
         potential_parameters_form_->addRow(
             label + ":",
@@ -3195,10 +3337,10 @@ MainWindow::potential_values_from_controls_() const {
 
     for (
         auto iterator =
-            potential_parameter_spins_.cbegin();
+                potential_parameter_spins_.cbegin();
 
         iterator !=
-            potential_parameter_spins_.cend();
+        potential_parameter_spins_.cend();
 
         ++iterator
     ) {
@@ -3215,7 +3357,7 @@ void MainWindow::use_builtin_potential_() {
     if (
         simulation_thread_ ||
         potential_state_ ==
-            PotentialState::Validating
+        PotentialState::Validating
     ) {
         return;
     }
@@ -3227,7 +3369,7 @@ void MainWindow::use_builtin_potential_() {
             .id = "V1",
             .label = "V₁",
             .description =
-                "Amplitude of the first harmonic.",
+            "Amplitude of the first harmonic.",
             .default_value = 0.20,
             .minimum = -100.0,
             .maximum = 100.0,
@@ -3239,7 +3381,7 @@ void MainWindow::use_builtin_potential_() {
             .id = "V2",
             .label = "V₂",
             .description =
-                "Amplitude of the second harmonic.",
+            "Amplitude of the second harmonic.",
             .default_value = 0.10,
             .minimum = -100.0,
             .maximum = 100.0,
@@ -3255,7 +3397,7 @@ void MainWindow::use_builtin_potential_() {
     active_potential_definition_.reset();
 
     potential_state_ =
-        PotentialState::Ready;
+            PotentialState::Ready;
 
     potential_info_label_->setText(
         "Built-in biharmonic profile\n"
@@ -3284,13 +3426,13 @@ void MainWindow::update_potential_controls_(
     bool is_running
 ) {
     const bool validating =
-        potential_state_ ==
-        PotentialState::Validating;
+            potential_state_ ==
+            PotentialState::Validating;
 
     run_button_->setEnabled(
         !is_running &&
         potential_state_ ==
-            PotentialState::Ready
+        PotentialState::Ready
     );
 
     open_potential_button_->setEnabled(
@@ -3311,13 +3453,13 @@ void MainWindow::update_potential_controls_(
     potential_parameters_scroll_->setEnabled(
         !is_running &&
         potential_state_ ==
-            PotentialState::Ready
+        PotentialState::Ready
     );
 
     const bool lookup_available =
-    potential_state_ == PotentialState::Ready &&
-    active_potential_definition_.has_value() &&
-    active_potential_definition_->profile.periodic;
+            potential_state_ == PotentialState::Ready &&
+            active_potential_definition_.has_value() &&
+            active_potential_definition_->profile.periodic;
 
     lookup_table_check_->setEnabled(
         !is_running &&
@@ -3330,18 +3472,18 @@ void MainWindow::update_potential_controls_(
 }
 
 void MainWindow::load_potential_file_(
-    const QString& file_name
+    const QString &file_name
 ) {
     if (
         simulation_thread_ ||
         potential_state_ ==
-            PotentialState::Validating
+        PotentialState::Validating
     ) {
         return;
     }
 
     potential_state_ =
-        PotentialState::Validating;
+            PotentialState::Validating;
 
     potential_drop_area_->set_message(
         "Validating potential..."
@@ -3372,23 +3514,23 @@ void MainWindow::load_potential_file_(
                 )
             ) {
                 failure_reason =
-                    "Expected a .bmpotential "
-                    "or .json file.";
+                        "Expected a .bmpotential "
+                        "or .json file.";
             } else if (
                 file_info.exists() &&
                 file_info.size() >
-                    1'048'576
+                1'048'576
             ) {
                 failure_reason =
-                    "Potential file exceeds "
-                    "the 1 MiB limit.";
+                        "Potential file exceeds "
+                        "the 1 MiB limit.";
             }
 
             PotentialConfigParseResult result;
 
             if (failure_reason.isEmpty()) {
                 result =
-                    PotentialConfigParser::
+                        PotentialConfigParser::
                         parse_file(
                             file_name
                         );
@@ -3397,7 +3539,7 @@ void MainWindow::load_potential_file_(
                     !result.is_success()
                 ) {
                     failure_reason =
-                        result.error_message;
+                            result.error_message;
                 }
             }
 
@@ -3405,7 +3547,7 @@ void MainWindow::load_potential_file_(
                 !failure_reason.isEmpty()
             ) {
                 potential_state_ =
-                    PotentialState::Invalid;
+                        PotentialState::Invalid;
 
                 potential_drop_area_->set_message(
                     "Invalid potential. "
@@ -3422,10 +3564,10 @@ void MainWindow::load_potential_file_(
                     QString{
                         "Potential rejected: %1\n%2"
                     }
-                        .arg(
-                            file_name,
-                            failure_reason
-                        )
+                    .arg(
+                        file_name,
+                        failure_reason
+                    )
                 );
 
                 log_experiment_event_(
@@ -3434,7 +3576,7 @@ void MainWindow::load_potential_file_(
                         {
                             "file_path",
                             file_info
-                                .absoluteFilePath()
+                            .absoluteFilePath()
                         },
                         {
                             "error",
@@ -3450,8 +3592,8 @@ void MainWindow::load_potential_file_(
                 return;
             }
 
-            const PotentialDefinition&
-                definition =
+            const PotentialDefinition &
+                    definition =
                     *result.definition;
 
             rebuild_potential_fields_(
@@ -3459,37 +3601,37 @@ void MainWindow::load_potential_file_(
             );
 
             active_potential_definition_ =
-                std::move(
-                    result.definition
-                );
+                    std::move(
+                        result.definition
+                    );
 
             potential_state_ =
-                PotentialState::Ready;
+                    PotentialState::Ready;
 
-            const auto& active =
-                *active_potential_definition_;
+            const auto &active =
+                    *active_potential_definition_;
 
             potential_info_label_->setText(
                 QString{
                     "%1\n%2"
                 }
-                    .arg(
-                        QString::fromStdString(
-                            active.name
-                        ),
-                        active.profile.periodic
-                            ? QString{
-                                "Periodic; period = %1"
-                            }.arg(
-                                active.profile.period,
-                                0,
-                                'g',
-                                12
-                            )
-                            : QString{
-                                "Non-periodic"
-                            }
-                    )
+                .arg(
+                    QString::fromStdString(
+                        active.name
+                    ),
+                    active.profile.periodic
+                        ? QString{
+                            "Periodic; period = %1"
+                        }.arg(
+                            active.profile.period,
+                            0,
+                            'g',
+                            12
+                        )
+                        : QString{
+                            "Non-periodic"
+                        }
+                )
             );
 
             potential_drop_area_->set_message(
@@ -3517,7 +3659,7 @@ void MainWindow::load_potential_file_(
             QJsonArray warnings;
 
             for (
-                const QString& warning :
+                const QString &warning:
                 result.warnings
             ) {
                 warnings.append(
@@ -3549,7 +3691,7 @@ void MainWindow::load_potential_file_(
                     {
                         "file_path",
                         file_info
-                            .absoluteFilePath()
+                        .absoluteFilePath()
                     },
                     {
                         "warnings",
@@ -3566,8 +3708,8 @@ void MainWindow::load_potential_file_(
 }
 
 void MainWindow::log_experiment_event_(
-    const QString& event_name,
-    const QJsonObject& data
+    const QString &event_name,
+    const QJsonObject &data
 ) {
     if (
         experiment_logger_.write_event(

@@ -85,7 +85,6 @@ struct EnsembleResult final {
     double mean_thermal_velocity{
         std::numeric_limits<double>::quiet_NaN()
     };
-
 };
 
 #endif // BROWNIAN_MOTOR_ENSEMBLERESULT_H

@@ -21,8 +21,8 @@ class ExpressionEvaluator;
  */
 [[nodiscard]] std::optional<std::string>
 check_potential_derivative(
-    const PotentialDefinition& definition,
-    const ExpressionEvaluator& evaluator
+    const PotentialDefinition &definition,
+    const ExpressionEvaluator &evaluator
 );
 
 #endif // BROWNIAN_MOTOR_POTENTIALDERIVATIVECHECK_H

@@ -6,22 +6,23 @@
 #include <type_traits>
 #include <utility>
 
-template <typename P>
+template<typename P>
 concept SpatialProfile =
-    std::invocable<P, double> &&
-    std::convertible_to<std::invoke_result_t<P, double>, double> &&
-    requires(const P& profile, double x) {
-    { profile.derivative(x) } -> std::convertible_to<double>;
-    };
+        std::invocable<P, double> &&
+        std::convertible_to<std::invoke_result_t<P, double>, double> &&
+        requires(const P &profile, double x)
+        {
+            { profile.derivative(x) } -> std::convertible_to<double>;
+        };
 
-template <SpatialProfile Profile>
+template<SpatialProfile Profile>
 class Potential final {
     Profile profile_;
 
 public:
     explicit Potential(Profile profile)
-        : profile_{std::move(profile)}
-    {}
+        : profile_{std::move(profile)} {
+    }
 
     [[nodiscard]] double value(
         double x,
@@ -41,7 +42,8 @@ public:
         double factor
     ) const noexcept {
         if constexpr (
-            requires(const Profile& profile, double position, double scale) {
+            requires(const Profile &profile, double position, double scale)
+            {
                 {
                     profile.derivative_scaled(position, scale)
                 } -> std::convertible_to<double>;
@@ -60,7 +62,7 @@ public:
         return -derivative_value(x, factor);
     }
 
-    [[nodiscard]] const Profile& profile() const noexcept {
+    [[nodiscard]] const Profile &profile() const noexcept {
         return profile_;
     }
 };

@@ -13,7 +13,7 @@ struct BiharmonicProfile final {
         constexpr double two_pi = 2.0 * std::numbers::pi_v<double>;
 
         return V1 * std::sin(two_pi * x)
-             + V2 * std::sin(2.0 * two_pi * x);
+               + V2 * std::sin(2.0 * two_pi * x);
     }
 
     [[nodiscard]] double derivative(double x) const noexcept {
@@ -28,17 +28,17 @@ struct BiharmonicProfile final {
         constexpr double four_pi = 4.0 * std::numbers::pi_v<double>;
 
         const double cosine_first_harmonic =
-            std::cos(two_pi * x);
+                std::cos(two_pi * x);
 
         const double cosine_second_harmonic =
-            2.0 * cosine_first_harmonic *
-            cosine_first_harmonic -
-            1.0;
+                2.0 * cosine_first_harmonic *
+                cosine_first_harmonic -
+                1.0;
 
         return factor * (
-            two_pi * V1 * cosine_first_harmonic +
-            four_pi * V2 * cosine_second_harmonic
-        );
+                   two_pi * V1 * cosine_first_harmonic +
+                   four_pi * V2 * cosine_second_harmonic
+               );
     }
 };
 

@@ -51,25 +51,28 @@ public:
     };
 
     explicit TrajectoryPlotWidget(
-        QWidget* parent = nullptr
+        QWidget *parent = nullptr
     );
 
     void clear_points();
+
     void append_point(double time, double mean_x);
 
     void begin_trend_selection();
+
     void clear_trend();
 
     void set_trend_range_highlight_visible(
-    bool visible
+        bool visible
     );
 
     [[nodiscard]] bool is_trend_range_highlight_visible() const;
 
     void validate_burn_in(
-    double dt,
-    double velocity_tolerance
+        double dt,
+        double velocity_tolerance
     );
+
     void clear_burn_in_validation();
 
     [[nodiscard]] bool has_trend() const;
@@ -104,32 +107,35 @@ signals:
     void trend_cleared();
 
     void trend_selection_failed(
-        const QString& message
+        const QString &message
     );
 
     void burn_in_validation_changed(
-    bool stable,
-    std::size_t recommended_burn_in_steps,
-    double start_time,
-    double early_velocity,
-    double late_velocity,
-    double tail_velocity,
-    double relative_velocity_difference,
-    double tail_r_squared,
-    double tolerance
+        bool stable,
+        std::size_t recommended_burn_in_steps,
+        double start_time,
+        double early_velocity,
+        double late_velocity,
+        double tail_velocity,
+        double relative_velocity_difference,
+        double tail_r_squared,
+        double tolerance
     );
 
     void burn_in_validation_cleared();
 
     void burn_in_validation_failed(
-        const QString& message
+        const QString &message
     );
 
 protected:
-    void paintEvent(QPaintEvent* event) override;
-    void mouseMoveEvent(QMouseEvent* event) override;
-    void leaveEvent(QEvent* event) override;
-    void mousePressEvent(QMouseEvent* event) override;
+    void paintEvent(QPaintEvent *event) override;
+
+    void mouseMoveEvent(QMouseEvent *event) override;
+
+    void leaveEvent(QEvent *event) override;
+
+    void mousePressEvent(QMouseEvent *event) override;
 
 private:
     struct PlotBounds {
@@ -149,14 +155,14 @@ private:
     [[nodiscard]] PlotBounds plot_bounds_() const;
 
     [[nodiscard]] QPointF map_to_plot_(
-        const QPointF& point,
-        const PlotBounds& bounds
+        const QPointF &point,
+        const PlotBounds &bounds
     ) const;
 
     [[nodiscard]] std::optional<std::size_t>
     nearest_point_index_(
-        const QPointF& mouse_position,
-        const PlotBounds& bounds
+        const QPointF &mouse_position,
+        const PlotBounds &bounds
     ) const;
 
     [[nodiscard]] bool calculate_trend_(

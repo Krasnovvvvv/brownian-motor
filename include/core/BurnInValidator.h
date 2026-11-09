@@ -32,7 +32,7 @@ struct BurnInValidationResult {
 class BurnInValidator final {
 public:
     [[nodiscard]] static BurnInValidationResult validate(
-        const std::vector<BurnInSample>& samples,
+        const std::vector<BurnInSample> &samples,
         double dt,
         double velocity_tolerance
     );

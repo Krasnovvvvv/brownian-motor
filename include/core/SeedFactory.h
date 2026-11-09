@@ -11,12 +11,12 @@ class SeedFactory final {
 public:
     enum class Stream : std::uint32_t {
         GaussianThermal = 0xA341316Cu,
-        Dichotomic      = 0xA5A5A5A5u
+        Dichotomic = 0xA5A5A5A5u
     };
 
     explicit SeedFactory(std::uint32_t run_seed)
-        : run_seed_{run_seed}
-    {}
+        : run_seed_{run_seed} {
+    }
 
     [[nodiscard]] std::uint32_t run_seed() const noexcept {
         return run_seed_;
@@ -25,8 +25,7 @@ public:
     [[nodiscard]] std::uint32_t particle_seed(
         std::size_t particle_index,
         Stream stream
-    ) const
-    {
+    ) const {
         const auto index = static_cast<std::uint64_t>(particle_index);
 
         std::seed_seq sequence{
@@ -47,8 +46,7 @@ public:
     [[nodiscard]] std::mt19937 make_mt19937(
         std::size_t particle_index,
         Stream stream
-    ) const
-    {
+    ) const {
         const auto index = static_cast<std::uint64_t>(particle_index);
 
         std::seed_seq sequence{

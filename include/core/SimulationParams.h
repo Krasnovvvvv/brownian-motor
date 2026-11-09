@@ -87,16 +87,16 @@ struct SimulationParams final {
             throw std::invalid_argument("x0 must be finite");
         }
 
-        if (periodic_profile &&(
-            !std::isfinite(spatial_period) ||
-            spatial_period <= 0.0
+        if (periodic_profile && (
+                !std::isfinite(spatial_period) ||
+                spatial_period <= 0.0
             )
-        )   {
+        ) {
             throw std::invalid_argument(
                 "spatial_period must be finite and > 0 "
                 "for a periodic profile"
             );
-            }
+        }
 
         if (trajectory_stride == 0) {
             throw std::invalid_argument(

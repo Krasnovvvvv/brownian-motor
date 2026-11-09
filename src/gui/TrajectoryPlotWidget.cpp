@@ -17,42 +17,39 @@
 #include <numeric>
 
 namespace {
+    constexpr int left_margin = 72;
+    constexpr int right_margin = 24;
+    constexpr int top_margin = 26;
+    constexpr int bottom_margin = 52;
 
-constexpr int left_margin = 72;
-constexpr int right_margin = 24;
-constexpr int top_margin = 26;
-constexpr int bottom_margin = 52;
+    constexpr int tick_count = 5;
+    constexpr int maximum_points = 5'000;
 
-constexpr int tick_count = 5;
-constexpr int maximum_points = 5'000;
+    constexpr double hover_distance_pixels = 18.0;
 
-constexpr double hover_distance_pixels = 18.0;
+    [[nodiscard]] double expand_range(
+        double minimum,
+        double maximum
+    ) {
+        const double range = maximum - minimum;
 
-[[nodiscard]] double expand_range(
-    double minimum,
-    double maximum
-) {
-    const double range = maximum - minimum;
+        if (range > 0.0 && std::isfinite(range)) {
+            return range;
+        }
 
-    if (range > 0.0 && std::isfinite(range)) {
-        return range;
+        const double magnitude = std::max(
+            1.0,
+            std::abs(minimum)
+        );
+
+        return 0.1 * magnitude;
     }
-
-    const double magnitude = std::max(
-        1.0,
-        std::abs(minimum)
-    );
-
-    return 0.1 * magnitude;
-}
-
 } // namespace
 
 TrajectoryPlotWidget::TrajectoryPlotWidget(
-    QWidget* parent
+    QWidget *parent
 )
-    : QWidget{parent}
-{
+    : QWidget{parent} {
     setMinimumHeight(240);
 
     setSizePolicy(
@@ -198,7 +195,7 @@ void TrajectoryPlotWidget::validate_burn_in(
     std::vector<BurnInSample> samples;
     samples.reserve(points_.size());
 
-    for (const QPointF& point : points_) {
+    for (const QPointF &point: points_) {
         samples.push_back(
             BurnInSample{
                 .time = point.x(),
@@ -208,11 +205,11 @@ void TrajectoryPlotWidget::validate_burn_in(
     }
 
     const BurnInValidationResult result =
-        BurnInValidator::validate(
-            samples,
-            dt,
-            velocity_tolerance
-        );
+            BurnInValidator::validate(
+                samples,
+                dt,
+                velocity_tolerance
+            );
 
     if (!result.valid) {
         emit burn_in_validation_failed(
@@ -228,13 +225,13 @@ void TrajectoryPlotWidget::validate_burn_in(
         .stable = result.stable,
         .start_index = result.start_index,
         .recommended_burn_in_steps =
-            result.recommended_burn_in_steps,
+        result.recommended_burn_in_steps,
         .start_time = result.start_time,
         .early_velocity = result.early_velocity,
         .late_velocity = result.late_velocity,
         .tail_velocity = result.tail_velocity,
         .relative_velocity_difference =
-            result.relative_velocity_difference,
+        result.relative_velocity_difference,
         .tail_r_squared = result.tail_r_squared,
         .tolerance = result.tolerance
     };
@@ -247,7 +244,7 @@ void TrajectoryPlotWidget::validate_burn_in(
         burn_in_validation_.late_velocity,
         burn_in_validation_.tail_velocity,
         burn_in_validation_
-            .relative_velocity_difference,
+        .relative_velocity_difference,
         burn_in_validation_.tail_r_squared,
         burn_in_validation_.tolerance
     );
@@ -269,8 +266,8 @@ void TrajectoryPlotWidget::clear_burn_in_validation() {
 
 bool TrajectoryPlotWidget::has_burn_in_validation() const {
     return
-        burn_in_validation_.valid &&
-        burn_in_validation_.stable;
+            burn_in_validation_.valid &&
+            burn_in_validation_.stable;
 }
 
 TrajectoryPlotWidget::BurnInValidation
@@ -326,18 +323,18 @@ TrajectoryPlotWidget::plot_bounds_() const {
     }
 
     double minimum_time =
-        std::numeric_limits<double>::infinity();
+            std::numeric_limits<double>::infinity();
 
     double maximum_time =
-        -std::numeric_limits<double>::infinity();
+            -std::numeric_limits<double>::infinity();
 
     double minimum_x =
-        std::numeric_limits<double>::infinity();
+            std::numeric_limits<double>::infinity();
 
     double maximum_x =
-        -std::numeric_limits<double>::infinity();
+            -std::numeric_limits<double>::infinity();
 
-    for (const QPointF& point : points_) {
+    for (const QPointF &point: points_) {
         minimum_time = std::min(
             minimum_time,
             point.x()
@@ -360,16 +357,16 @@ TrajectoryPlotWidget::plot_bounds_() const {
     }
 
     const double time_padding =
-        0.03 * expand_range(
-            minimum_time,
-            maximum_time
-        );
+            0.03 * expand_range(
+                minimum_time,
+                maximum_time
+            );
 
     const double x_padding =
-        0.10 * expand_range(
-            minimum_x,
-            maximum_x
-        );
+            0.10 * expand_range(
+                minimum_x,
+                maximum_x
+            );
 
     bounds.minimum_time = std::max(
         0.0,
@@ -377,48 +374,48 @@ TrajectoryPlotWidget::plot_bounds_() const {
     );
 
     bounds.maximum_time =
-        maximum_time + time_padding;
+            maximum_time + time_padding;
 
     bounds.minimum_x =
-        minimum_x - x_padding;
+            minimum_x - x_padding;
 
     bounds.maximum_x =
-        maximum_x + x_padding;
+            maximum_x + x_padding;
 
     return bounds;
 }
 
 QPointF TrajectoryPlotWidget::map_to_plot_(
-    const QPointF& point,
-    const PlotBounds& bounds
+    const QPointF &point,
+    const PlotBounds &bounds
 ) const {
     const double time_range =
-        bounds.maximum_time - bounds.minimum_time;
+            bounds.maximum_time - bounds.minimum_time;
 
     const double x_range =
-        bounds.maximum_x - bounds.minimum_x;
+            bounds.maximum_x - bounds.minimum_x;
 
     const double normalized_time =
-        (point.x() - bounds.minimum_time) /
-        time_range;
+            (point.x() - bounds.minimum_time) /
+            time_range;
 
     const double normalized_x =
-        (point.y() - bounds.minimum_x) /
-        x_range;
+            (point.y() - bounds.minimum_x) /
+            x_range;
 
     return QPointF{
         bounds.rect.left() +
-            normalized_time * bounds.rect.width(),
+        normalized_time * bounds.rect.width(),
 
         bounds.rect.bottom() -
-            normalized_x * bounds.rect.height()
+        normalized_x * bounds.rect.height()
     };
 }
 
 std::optional<std::size_t>
 TrajectoryPlotWidget::nearest_point_index_(
-    const QPointF& mouse_position,
-    const PlotBounds& bounds
+    const QPointF &mouse_position,
+    const PlotBounds &bounds
 ) const {
     if (
         points_.empty() ||
@@ -430,8 +427,8 @@ TrajectoryPlotWidget::nearest_point_index_(
     std::optional<std::size_t> nearest_index;
 
     double minimum_distance_squared =
-        hover_distance_pixels *
-        hover_distance_pixels;
+            hover_distance_pixels *
+            hover_distance_pixels;
 
     for (
         std::size_t index = 0;
@@ -439,16 +436,16 @@ TrajectoryPlotWidget::nearest_point_index_(
         ++index
     ) {
         const QPointF screen_point =
-            map_to_plot_(points_[index], bounds);
+                map_to_plot_(points_[index], bounds);
 
         const double dx =
-            screen_point.x() - mouse_position.x();
+                screen_point.x() - mouse_position.x();
 
         const double dy =
-            screen_point.y() - mouse_position.y();
+                screen_point.y() - mouse_position.y();
 
         const double distance_squared =
-            dx * dx + dy * dy;
+                dx * dx + dy * dy;
 
         if (distance_squared <= minimum_distance_squared) {
             minimum_distance_squared = distance_squared;
@@ -467,7 +464,7 @@ bool TrajectoryPlotWidget::calculate_trend_(
     if (
         start_index >= points_.size() ||
         points_.size() - start_index <
-            minimum_trend_points
+        minimum_trend_points
     ) {
         emit trend_selection_failed(
             "Choose a point with at least two "
@@ -483,7 +480,7 @@ bool TrajectoryPlotWidget::calculate_trend_(
     long double sum_time_x = 0.0L;
 
     const std::size_t count =
-        points_.size() - start_index;
+            points_.size() - start_index;
 
     for (
         std::size_t index = start_index;
@@ -491,14 +488,14 @@ bool TrajectoryPlotWidget::calculate_trend_(
         ++index
     ) {
         const long double time =
-            static_cast<long double>(
-                points_[index].x()
-            );
+                static_cast<long double>(
+                    points_[index].x()
+                );
 
         const long double mean_x =
-            static_cast<long double>(
-                points_[index].y()
-            );
+                static_cast<long double>(
+                    points_[index].y()
+                );
 
         sum_time += time;
         sum_x += mean_x;
@@ -507,9 +504,9 @@ bool TrajectoryPlotWidget::calculate_trend_(
     }
 
     const long double denominator =
-        static_cast<long double>(count) *
-        sum_time_squared -
-        sum_time * sum_time;
+            static_cast<long double>(count) *
+            sum_time_squared -
+            sum_time * sum_time;
 
     if (
         !std::isfinite(
@@ -526,20 +523,20 @@ bool TrajectoryPlotWidget::calculate_trend_(
     }
 
     const long double slope =
-        (
-            static_cast<long double>(count) *
-            sum_time_x -
-            sum_time * sum_x
-        ) / denominator;
+    (
+        static_cast<long double>(count) *
+        sum_time_x -
+        sum_time * sum_x
+    ) / denominator;
 
     const long double intercept =
-        (
-            sum_x -
-            slope * sum_time
-        ) / static_cast<long double>(count);
+    (
+        sum_x -
+        slope * sum_time
+    ) / static_cast<long double>(count);
 
     const long double mean_x =
-        sum_x / static_cast<long double>(count);
+            sum_x / static_cast<long double>(count);
 
     long double residual_sum = 0.0L;
     long double total_sum = 0.0L;
@@ -550,23 +547,23 @@ bool TrajectoryPlotWidget::calculate_trend_(
         ++index
     ) {
         const long double time =
-            static_cast<long double>(
-                points_[index].x()
-            );
+                static_cast<long double>(
+                    points_[index].x()
+                );
 
         const long double value =
-            static_cast<long double>(
-                points_[index].y()
-            );
+                static_cast<long double>(
+                    points_[index].y()
+                );
 
         const long double fitted =
-            intercept + slope * time;
+                intercept + slope * time;
 
         const long double residual =
-            value - fitted;
+                value - fitted;
 
         const long double deviation =
-            value - mean_x;
+                value - mean_x;
 
         residual_sum += residual * residual;
         total_sum += deviation * deviation;
@@ -593,7 +590,7 @@ bool TrajectoryPlotWidget::calculate_trend_(
 }
 
 void TrajectoryPlotWidget::paintEvent(
-    QPaintEvent* event
+    QPaintEvent *event
 ) {
     Q_UNUSED(event);
 
@@ -630,20 +627,20 @@ void TrajectoryPlotWidget::paintEvent(
     );
 
     const PlotBounds bounds = plot_bounds_();
-    const QRectF& plot_rect = bounds.rect;
+    const QRectF &plot_rect = bounds.rect;
 
     const bool show_burn_in =
-        burn_in_validation_.valid &&
-        burn_in_validation_.stable;
+            burn_in_validation_.valid &&
+            burn_in_validation_.stable;
 
     const bool show_trend =
-        trend_.valid;
+            trend_.valid;
 
     const QColor text_color =
-        palette().color(QPalette::Text);
+            palette().color(QPalette::Text);
 
     const QColor grid_color =
-        palette().color(QPalette::Midlight);
+            palette().color(QPalette::Midlight);
 
     painter.setPen(
         QPen{
@@ -724,10 +721,10 @@ void TrajectoryPlotWidget::paintEvent(
     }
 
     const double time_range =
-        bounds.maximum_time - bounds.minimum_time;
+            bounds.maximum_time - bounds.minimum_time;
 
     const double x_range =
-        bounds.maximum_x - bounds.minimum_x;
+            bounds.maximum_x - bounds.minimum_x;
 
     QString burn_in_tick_text;
 
@@ -742,48 +739,48 @@ void TrajectoryPlotWidget::paintEvent(
         );
 
         burn_in_tick_x =
-            map_to_plot_(
-                QPointF{
-                    burn_in_validation_.start_time,
-                    bounds.minimum_x
-                },
-                bounds
-            ).x();
+                map_to_plot_(
+                    QPointF{
+                        burn_in_validation_.start_time,
+                        bounds.minimum_x
+                    },
+                    bounds
+                ).x();
 
         const qreal burn_in_tick_width =
-            static_cast<qreal>(
-                tick_metrics.horizontalAdvance(
-                    burn_in_tick_text
-                )
-            );
+                static_cast<qreal>(
+                    tick_metrics.horizontalAdvance(
+                        burn_in_tick_text
+                    )
+                );
 
         burn_in_tick_left =
-            burn_in_tick_x -
-            burn_in_tick_width / 2.0;
+                burn_in_tick_x -
+                burn_in_tick_width / 2.0;
 
         burn_in_tick_right =
-            burn_in_tick_x +
-            burn_in_tick_width / 2.0;
+                burn_in_tick_x +
+                burn_in_tick_width / 2.0;
     }
 
     painter.setFont(tick_font);
 
     for (int index = 0; index <= tick_count; ++index) {
         const double fraction =
-            static_cast<double>(index) /
-            static_cast<double>(tick_count);
+                static_cast<double>(index) /
+                static_cast<double>(tick_count);
 
         const qreal x_position =
-            plot_rect.left() +
-            static_cast<qreal>(
-                fraction * plot_rect.width()
-            );
+                plot_rect.left() +
+                static_cast<qreal>(
+                    fraction * plot_rect.width()
+                );
 
         const qreal y_position =
-            plot_rect.bottom() -
-            static_cast<qreal>(
-                fraction * plot_rect.height()
-            );
+                plot_rect.bottom() -
+                static_cast<qreal>(
+                    fraction * plot_rect.height()
+                );
 
         painter.setPen(
             QPen{
@@ -822,22 +819,22 @@ void TrajectoryPlotWidget::paintEvent(
         );
 
         const qreal time_text_width =
-    static_cast<qreal>(
-        tick_metrics.horizontalAdvance(
-            time_text
-        )
-    );
+                static_cast<qreal>(
+                    tick_metrics.horizontalAdvance(
+                        time_text
+                    )
+                );
 
         const qreal time_text_left =
-            x_position - time_text_width / 2.0;
+                x_position - time_text_width / 2.0;
 
         const qreal time_text_right =
-            x_position + time_text_width / 2.0;
+                x_position + time_text_width / 2.0;
 
         const bool overlaps_burn_in_label =
-            show_burn_in &&
-            time_text_right >= burn_in_tick_left - 4.0 &&
-            time_text_left <= burn_in_tick_right + 4.0;
+                show_burn_in &&
+                time_text_right >= burn_in_tick_left - 4.0 &&
+                time_text_left <= burn_in_tick_right + 4.0;
 
         if (!overlaps_burn_in_label) {
             painter.drawText(
@@ -857,16 +854,16 @@ void TrajectoryPlotWidget::paintEvent(
         painter.drawText(
             QPointF{
                 plot_rect.left() -
-                    static_cast<qreal>(
-                        tick_metrics.horizontalAdvance(
-                            x_text
-                        )
-                    ) - 8.0,
+                static_cast<qreal>(
+                    tick_metrics.horizontalAdvance(
+                        x_text
+                    )
+                ) - 8.0,
 
                 y_position +
-                    static_cast<qreal>(
-                        tick_metrics.ascent()
-                    ) / 2.0
+                static_cast<qreal>(
+                    tick_metrics.ascent()
+                ) / 2.0
             },
             x_text
         );
@@ -923,23 +920,23 @@ void TrajectoryPlotWidget::paintEvent(
     painter.restore();
 
     painter.setFont(base_font);
-    
+
     if (show_burn_in) {
         const QPointF burn_in_screen_point =
-            map_to_plot_(
-                QPointF{
-                    burn_in_validation_.start_time,
-                    bounds.minimum_x
-                },
-                bounds
-            );
+                map_to_plot_(
+                    QPointF{
+                        burn_in_validation_.start_time,
+                        bounds.minimum_x
+                    },
+                    bounds
+                );
 
         const QRectF transient_rect{
             plot_rect.left(),
             plot_rect.top(),
             std::clamp(
                 burn_in_screen_point.x() -
-                    plot_rect.left(),
+                plot_rect.left(),
                 0.0,
                 plot_rect.width()
             ),
@@ -955,13 +952,13 @@ void TrajectoryPlotWidget::paintEvent(
     if (show_trend &&
         trend_range_highlight_visible_) {
         const QPointF trend_start_on_axis =
-            map_to_plot_(
-                QPointF{
-                    points_[trend_.start_index].x(),
-                    bounds.minimum_x
-                },
-                bounds
-            );
+                map_to_plot_(
+                    QPointF{
+                        points_[trend_.start_index].x(),
+                        bounds.minimum_x
+                    },
+                    bounds
+                );
 
         const QRectF trend_range_rect{
             trend_start_on_axis.x(),
@@ -969,7 +966,7 @@ void TrajectoryPlotWidget::paintEvent(
             std::max(
                 0.0,
                 plot_rect.right() -
-                    trend_start_on_axis.x()
+                trend_start_on_axis.x()
             ),
             plot_rect.height()
         };
@@ -1018,18 +1015,18 @@ void TrajectoryPlotWidget::paintEvent(
 
     if (show_trend) {
         const QPointF start_data_point =
-            points_[trend_.start_index];
+                points_[trend_.start_index];
 
         const QPointF trend_start{
             start_data_point.x(),
             trend_.intercept +
-                trend_.slope * start_data_point.x()
+            trend_.slope * start_data_point.x()
         };
 
         const QPointF trend_end{
             points_.back().x(),
             trend_.intercept +
-                trend_.slope * points_.back().x()
+            trend_.slope * points_.back().x()
         };
 
         painter.setPen(
@@ -1056,13 +1053,13 @@ void TrajectoryPlotWidget::paintEvent(
 
     if (show_burn_in) {
         const QPointF burn_in_screen_point =
-            map_to_plot_(
-                QPointF{
-                    burn_in_validation_.start_time,
-                    bounds.minimum_x
-                },
-                bounds
-            );
+                map_to_plot_(
+                    QPointF{
+                        burn_in_validation_.start_time,
+                        bounds.minimum_x
+                    },
+                    bounds
+                );
 
         painter.setPen(
             QPen{
@@ -1087,16 +1084,16 @@ void TrajectoryPlotWidget::paintEvent(
     }
 
     const int legend_rows =
-        1 +
-        (show_trend ? 1 : 0) +
-        (show_burn_in ? 1 : 0);
+            1 +
+            (show_trend ? 1 : 0) +
+            (show_burn_in ? 1 : 0);
 
     const qreal legend_width = 154.0;
     const qreal legend_row_height = 21.0;
 
     const qreal legend_height =
-        12.0 +
-        legend_rows * legend_row_height;
+            12.0 +
+            legend_rows * legend_row_height;
 
     const QRectF legend_rect{
         plot_rect.right() - legend_width - 10.0,
@@ -1125,48 +1122,48 @@ void TrajectoryPlotWidget::paintEvent(
     painter.setFont(base_font);
 
     qreal legend_y =
-        legend_rect.top() + 16.0;
+            legend_rect.top() + 16.0;
 
     const auto draw_legend_entry =
-        [&painter, &legend_rect, &legend_y](
-            const QColor& color,
-            Qt::PenStyle style,
-            const QString& text
-        ) {
-            painter.setPen(
-                QPen{
-                    color,
-                    2.0,
-                    style,
-                    Qt::RoundCap
-                }
-            );
+            [&painter, &legend_rect, &legend_y](
+        const QColor &color,
+        Qt::PenStyle style,
+        const QString &text
+    ) {
+        painter.setPen(
+            QPen{
+                color,
+                2.0,
+                style,
+                Qt::RoundCap
+            }
+        );
 
-            painter.drawLine(
-                QPointF{
-                    legend_rect.left() + 10.0,
-                    legend_y
-                },
-                QPointF{
-                    legend_rect.left() + 34.0,
-                    legend_y
-                }
-            );
+        painter.drawLine(
+            QPointF{
+                legend_rect.left() + 10.0,
+                legend_y
+            },
+            QPointF{
+                legend_rect.left() + 34.0,
+                legend_y
+            }
+        );
 
-            painter.setPen(
-                QColor{"#E2E8F0"}
-            );
+        painter.setPen(
+            QColor{"#E2E8F0"}
+        );
 
-            painter.drawText(
-                QPointF{
-                    legend_rect.left() + 43.0,
-                    legend_y + 5.0
-                },
-                text
-            );
+        painter.drawText(
+            QPointF{
+                legend_rect.left() + 43.0,
+                legend_y + 5.0
+            },
+            text
+        );
 
-            legend_y += 21.0;
-        };
+        legend_y += 21.0;
+    };
 
     draw_legend_entry(
         QColor{35, 120, 220},
@@ -1192,13 +1189,13 @@ void TrajectoryPlotWidget::paintEvent(
 
     if (hovered_index_) {
         const QPointF hovered_data_point =
-            points_[*hovered_index_];
+                points_[*hovered_index_];
 
         const QPointF hovered_screen_point =
-            map_to_plot_(
-                hovered_data_point,
-                bounds
-            );
+                map_to_plot_(
+                    hovered_data_point,
+                    bounds
+                );
 
         painter.setPen(
             QPen{
@@ -1237,51 +1234,51 @@ void TrajectoryPlotWidget::paintEvent(
         );
 
         const QString hover_text = QString{
-            "#%1\n"
-            "t = %2\n"
-            "<x> = %3"
-        }
-            .arg(
-                static_cast<qulonglong>(
-                    *hovered_index_ + 1
+                    "#%1\n"
+                    "t = %2\n"
+                    "<x> = %3"
+                }
+                .arg(
+                    static_cast<qulonglong>(
+                        *hovered_index_ + 1
+                    )
                 )
-            )
-            .arg(
-                format_value_(
-                    hovered_data_point.x()
+                .arg(
+                    format_value_(
+                        hovered_data_point.x()
+                    )
                 )
-            )
-            .arg(
-                format_value_(
-                    hovered_data_point.y()
-                )
-            );
+                .arg(
+                    format_value_(
+                        hovered_data_point.y()
+                    )
+                );
 
         const QRect tooltip_rect =
-            metrics.boundingRect(
-                QRect{
-                    0,
-                    0,
-                    220,
-                    100
-                },
-                Qt::AlignLeft | Qt::TextWordWrap,
-                hover_text
-            ).adjusted(-8, -6, 8, 6);
+                metrics.boundingRect(
+                    QRect{
+                        0,
+                        0,
+                        220,
+                        100
+                    },
+                    Qt::AlignLeft | Qt::TextWordWrap,
+                    hover_text
+                ).adjusted(-8, -6, 8, 6);
 
         qreal tooltip_x =
-            hovered_screen_point.x() + 14.0;
+                hovered_screen_point.x() + 14.0;
 
         qreal tooltip_y =
-            hovered_screen_point.y() - 14.0;
+                hovered_screen_point.y() - 14.0;
 
         if (
             tooltip_x + tooltip_rect.width() >
             plot_rect.right()
         ) {
             tooltip_x =
-                hovered_screen_point.x() -
-                tooltip_rect.width() - 14.0;
+                    hovered_screen_point.x() -
+                    tooltip_rect.width() - 14.0;
         }
 
         if (tooltip_y < plot_rect.top()) {
@@ -1293,8 +1290,8 @@ void TrajectoryPlotWidget::paintEvent(
             plot_rect.bottom()
         ) {
             tooltip_y =
-                plot_rect.bottom() -
-                tooltip_rect.height() - 4.0;
+                    plot_rect.bottom() -
+                    tooltip_rect.height() - 4.0;
         }
 
         const QRectF tooltip_draw_rect{
@@ -1342,10 +1339,10 @@ void TrajectoryPlotWidget::paintEvent(
     }
 
     const QPointF last_point =
-        map_to_plot_(
-            points_.back(),
-            bounds
-        );
+            map_to_plot_(
+                points_.back(),
+                bounds
+            );
 
     painter.setBrush(
         QColor{35, 120, 220}
@@ -1361,25 +1358,25 @@ void TrajectoryPlotWidget::paintEvent(
 
     if (selecting_trend_start_) {
         const QString instruction =
-            "Click a data point to select trend start";
+                "Click a data point to select trend start";
 
         const QRect instruction_rect =
-            metrics.boundingRect(
-                QRect{
-                    0,
-                    0,
-                    320,
-                    32
-                },
-                Qt::AlignCenter,
-                instruction
-            ).adjusted(-10, -6, 10, 6);
+                metrics.boundingRect(
+                    QRect{
+                        0,
+                        0,
+                        320,
+                        32
+                    },
+                    Qt::AlignCenter,
+                    instruction
+                ).adjusted(-10, -6, 10, 6);
 
         const QRectF instruction_draw_rect{
             plot_rect.center().x() -
-                static_cast<qreal>(
-                    instruction_rect.width()
-                ) / 2.0,
+            static_cast<qreal>(
+                instruction_rect.width()
+            ) / 2.0,
 
             plot_rect.top() + 8.0,
 
@@ -1422,14 +1419,14 @@ void TrajectoryPlotWidget::paintEvent(
 }
 
 void TrajectoryPlotWidget::mouseMoveEvent(
-    QMouseEvent* event
+    QMouseEvent *event
 ) {
     if (points_.empty()) {
         return;
     }
 
     const std::optional<std::size_t> previous_index =
-        hovered_index_;
+            hovered_index_;
 
     hovered_index_ = nearest_point_index_(
         event->position(),
@@ -1444,7 +1441,7 @@ void TrajectoryPlotWidget::mouseMoveEvent(
 }
 
 void TrajectoryPlotWidget::leaveEvent(
-    QEvent* event
+    QEvent *event
 ) {
     if (hovered_index_) {
         hovered_index_.reset();
@@ -1455,7 +1452,7 @@ void TrajectoryPlotWidget::leaveEvent(
 }
 
 void TrajectoryPlotWidget::mousePressEvent(
-    QMouseEvent* event
+    QMouseEvent *event
 ) {
     if (
         event->button() != Qt::LeftButton ||
@@ -1466,10 +1463,10 @@ void TrajectoryPlotWidget::mousePressEvent(
     }
 
     const std::optional<std::size_t> selected_index =
-        nearest_point_index_(
-            event->position(),
-            plot_bounds_()
-        );
+            nearest_point_index_(
+                event->position(),
+                plot_bounds_()
+            );
 
     if (!selected_index) {
         emit trend_selection_failed(
@@ -1507,7 +1504,7 @@ QString TrajectoryPlotWidget::format_value_(
     }
 
     const double magnitude =
-        std::abs(value);
+            std::abs(value);
 
     if (
         magnitude >= 10'000.0 ||

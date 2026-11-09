@@ -9,13 +9,12 @@
 class PeriodicTwoStateModulation final {
 public:
     explicit PeriodicTwoStateModulation(
-        const ModulationSettings& settings
+        const ModulationSettings &settings
     )
         : factor_a_{settings.factor_a}
-    , factor_b_{settings.factor_b}
-    , steps_a_{settings.steps_a}
-    , steps_b_{settings.steps_b}
-    {
+          , factor_b_{settings.factor_b}
+          , steps_a_{settings.steps_a}
+          , steps_b_{settings.steps_b} {
         settings.validate();
     }
 
@@ -26,12 +25,12 @@ public:
      */
     [[nodiscard]] double step() noexcept {
         const double result =
-            state_is_a_ ? factor_a_ : factor_b_;
+                state_is_a_ ? factor_a_ : factor_b_;
 
         ++steps_in_state_;
 
         const std::size_t dwell_steps =
-            state_is_a_ ? steps_a_ : steps_b_;
+                state_is_a_ ? steps_a_ : steps_b_;
 
         if (steps_in_state_ == dwell_steps) {
             steps_in_state_ = 0;

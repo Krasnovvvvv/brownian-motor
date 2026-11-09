@@ -8,51 +8,48 @@
 #include <QVBoxLayout>
 
 namespace {
-
-[[nodiscard]] QString local_file_from_mime_data(
-    const QMimeData* mime_data
-) {
-    if (
-        !mime_data ||
-        !mime_data->hasUrls() ||
-        mime_data->urls().size() != 1
+    [[nodiscard]] QString local_file_from_mime_data(
+        const QMimeData *mime_data
     ) {
-        return {};
+        if (
+            !mime_data ||
+            !mime_data->hasUrls() ||
+            mime_data->urls().size() != 1
+        ) {
+            return {};
+        }
+
+        const QUrl url =
+                mime_data->urls().front();
+
+        if (!url.isLocalFile()) {
+            return {};
+        }
+
+        const QString file_name =
+                url.toLocalFile();
+
+        if (
+            !file_name.endsWith(
+                ".bmpotential",
+                Qt::CaseInsensitive
+            ) &&
+            !file_name.endsWith(
+                ".json",
+                Qt::CaseInsensitive
+            )
+        ) {
+            return {};
+        }
+
+        return file_name;
     }
-
-    const QUrl url =
-        mime_data->urls().front();
-
-    if (!url.isLocalFile()) {
-        return {};
-    }
-
-    const QString file_name =
-        url.toLocalFile();
-
-    if (
-        !file_name.endsWith(
-            ".bmpotential",
-            Qt::CaseInsensitive
-        ) &&
-        !file_name.endsWith(
-            ".json",
-            Qt::CaseInsensitive
-        )
-    ) {
-        return {};
-    }
-
-    return file_name;
-}
-
 } // namespace
 
 PotentialDropArea::PotentialDropArea(
-    QWidget* parent
+    QWidget *parent
 )
-    : QFrame{parent}
-{
+    : QFrame{parent} {
     setAcceptDrops(true);
 
     setFrameShape(
@@ -61,7 +58,7 @@ PotentialDropArea::PotentialDropArea(
 
     setMinimumHeight(48);
 
-    auto* layout = new QVBoxLayout{this};
+    auto *layout = new QVBoxLayout{this};
 
     layout->setContentsMargins(
         6,
@@ -91,8 +88,8 @@ PotentialDropArea::PotentialDropArea(
 }
 
 void PotentialDropArea::set_message(
-    const QString& message,
-    const QString& details
+    const QString &message,
+    const QString &details
 ) {
     message_label_->setText(message);
 
@@ -104,7 +101,7 @@ void PotentialDropArea::set_message(
 }
 
 void PotentialDropArea::dragEnterEvent(
-    QDragEnterEvent* event
+    QDragEnterEvent *event
 ) {
     if (
         isEnabled() &&
@@ -119,12 +116,12 @@ void PotentialDropArea::dragEnterEvent(
 }
 
 void PotentialDropArea::dropEvent(
-    QDropEvent* event
+    QDropEvent *event
 ) {
     const QString file_name =
-        local_file_from_mime_data(
-            event->mimeData()
-        );
+            local_file_from_mime_data(
+                event->mimeData()
+            );
 
     if (
         !isEnabled() ||

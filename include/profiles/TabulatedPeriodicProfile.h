@@ -13,7 +13,7 @@
 
 #include "core/Potential.h"
 
-template <SpatialProfile ExactProfile>
+template<SpatialProfile ExactProfile>
 class TabulatedPeriodicProfile final {
 public:
     explicit TabulatedPeriodicProfile(
@@ -22,14 +22,14 @@ public:
         std::size_t intervals = 16'384
     )
         : exact_profile_{std::move(exact_profile)}
-        , table_{
-            build_table_(
-                exact_profile_,
-                period,
-                intervals
-            )
-        }
-    {}
+          , table_{
+              build_table_(
+                  exact_profile_,
+                  period,
+                  intervals
+              )
+          } {
+    }
 
     [[nodiscard]] double operator()(
         double x
@@ -40,7 +40,7 @@ public:
     [[nodiscard]] double derivative(
         double x
     ) const noexcept {
-        const Table& table = *table_;
+        const Table &table = *table_;
 
         if (!std::isfinite(x)) {
             return invalid_value_();
@@ -69,7 +69,7 @@ public:
         }
 
         const double grid_position =
-            phase * table.inverse_step;
+                phase * table.inverse_step;
 
         /*
          * Multiplication can round a position very close
@@ -83,13 +83,13 @@ public:
         }
 
         const auto index =
-            static_cast<std::size_t>(
-                grid_position
-            );
+                static_cast<std::size_t>(
+                    grid_position
+                );
 
         const double fraction =
-            grid_position -
-            static_cast<double>(index);
+                grid_position -
+                static_cast<double>(index);
 
         return std::lerp(
             table.samples[index],
@@ -133,7 +133,7 @@ private:
 
     [[nodiscard]] static std::shared_ptr<const Table>
     build_table_(
-        const ExactProfile& exact_profile,
+        const ExactProfile &exact_profile,
         double period,
         std::size_t intervals
     ) {
@@ -147,7 +147,7 @@ private:
         }
 
         constexpr std::size_t max_intervals =
-            1'048'576;
+                1'048'576;
 
         if (
             intervals < 2 ||
@@ -160,7 +160,7 @@ private:
         }
 
         const double inverse_step =
-            static_cast<double>(intervals) / period;
+                static_cast<double>(intervals) / period;
 
         if (
             !std::isfinite(inverse_step) ||
@@ -185,14 +185,14 @@ private:
             ++index
         ) {
             const double x =
-                period *
-                (
-                    static_cast<double>(index) /
-                    static_cast<double>(intervals)
-                );
+                    period *
+                    (
+                        static_cast<double>(index) /
+                        static_cast<double>(intervals)
+                    );
 
             const double value =
-                exact_profile.derivative(x);
+                    exact_profile.derivative(x);
 
             if (!std::isfinite(value)) {
                 throw std::domain_error(
@@ -210,10 +210,10 @@ private:
          * the potential definition.
          */
         const double endpoint =
-            exact_profile.derivative(period);
+                exact_profile.derivative(period);
 
         const double first =
-            table->samples.front();
+                table->samples.front();
 
         if (!std::isfinite(endpoint)) {
             throw std::domain_error(
@@ -229,10 +229,10 @@ private:
         });
 
         const double normalized_difference =
-            std::abs(
-                first / scale -
-                endpoint / scale
-            );
+                std::abs(
+                    first / scale -
+                    endpoint / scale
+                );
 
         if (normalized_difference > 1.0e-9) {
             throw std::domain_error(

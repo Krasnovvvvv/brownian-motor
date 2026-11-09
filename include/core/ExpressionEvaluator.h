@@ -9,26 +9,26 @@
 class ExpressionEvaluator final {
 public:
     explicit ExpressionEvaluator(
-        const PotentialDefinition& definition,
-        const PotentialParameterValues& parameter_values = {}
+        const PotentialDefinition &definition,
+        const PotentialParameterValues &parameter_values = {}
     );
 
     ~ExpressionEvaluator();
 
     ExpressionEvaluator(
-        const ExpressionEvaluator& other
+        const ExpressionEvaluator &other
     );
 
-    ExpressionEvaluator& operator=(
-        const ExpressionEvaluator& other
+    ExpressionEvaluator &operator=(
+        const ExpressionEvaluator &other
     );
 
     ExpressionEvaluator(
-        ExpressionEvaluator&&
+        ExpressionEvaluator &&
     ) noexcept;
 
-    ExpressionEvaluator& operator=(
-        ExpressionEvaluator&&
+    ExpressionEvaluator &operator=(
+        ExpressionEvaluator &&
     ) noexcept;
 
     /*
@@ -55,7 +55,7 @@ public:
         double coordinate
     ) const noexcept;
 
-    [[nodiscard]] const PotentialDefinition&
+    [[nodiscard]] const PotentialDefinition &
     definition() const noexcept;
 
 private:

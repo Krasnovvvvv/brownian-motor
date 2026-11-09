@@ -24,16 +24,15 @@ struct PotentialConfigParseResult final {
 
 class PotentialConfigParser final {
 public:
-    
     [[nodiscard]] static PotentialConfigParseResult
     parse_file(
-        const QString& file_name
+        const QString &file_name
     );
 
     [[nodiscard]] static PotentialConfigParseResult
     parse_json(
-        const QByteArray& json_data,
-        const QString& source_name = {}
+        const QByteArray &json_data,
+        const QString &source_name = {}
     );
 };
 

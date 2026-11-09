@@ -8,33 +8,33 @@
 class TwoStateFactorModulation final {
 public:
     explicit TwoStateFactorModulation(
-        const ModulationSettings& settings,
+        const ModulationSettings &settings,
         double dt,
         unsigned int seed
     )
         : process_{
-        make_params_(settings, dt),
-        seed
+              make_params_(settings, dt),
+              seed
+          }
+          , factor_a_{settings.factor_a}
+          , factor_b_{settings.factor_b} {
     }
-    , factor_a_{settings.factor_a}
-    , factor_b_{settings.factor_b}
-    {}
 
     [[nodiscard]] double step() noexcept {
-        (void)process_.step();
+        (void) process_.step();
 
         return current_factor();
     }
 
     [[nodiscard]] double current_factor() const noexcept {
         return process_.current_sigma() >= 0.0
-            ? factor_a_
-            : factor_b_;
+                   ? factor_a_
+                   : factor_b_;
     }
 
 private:
     [[nodiscard]] static DichotomicParams make_params_(
-        const ModulationSettings& settings,
+        const ModulationSettings &settings,
         double dt
     ) {
         settings.validate();

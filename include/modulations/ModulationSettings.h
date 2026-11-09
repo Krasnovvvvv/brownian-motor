@@ -36,41 +36,41 @@ struct ModulationSettings final {
 
     void validate() const {
         switch (kind) {
-        case ModulationKind::LegacySymmetric:
-            return;
-        case ModulationKind::MarkovTwoState:
-            validate_factors_();
-            if (!std::isfinite(gamma_a) || !std::isfinite(gamma_b) ||
-                gamma_a <= 0.0 || gamma_b <= 0.0 ||
-                !std::isfinite(gamma_a + gamma_b)) {
-                throw std::invalid_argument(
-                    "Transition rates and their sum must be finite and positive"
-                );
-            }
-            return;
-        case ModulationKind::PeriodicTwoState:
-            validate_factors_();
-            if (steps_a == 0 || steps_b == 0) {
-                throw std::invalid_argument("Dwell steps must be positive");
-            }
-            return;
-        case ModulationKind::Constant:
-            if (!std::isfinite(constant_factor)) {
-                throw std::invalid_argument("Constant factor must be finite");
-            }
-            return;
-        case ModulationKind::Sinusoidal:
-            if (!std::isfinite(sinusoidal_offset) ||
-                !std::isfinite(sinusoidal_amplitude) ||
-                sinusoidal_amplitude < 0.0 ||
-                !std::isfinite(sinusoidal_period) || sinusoidal_period <= 0.0 ||
-                !std::isfinite(sinusoidal_phase) ||
-                !std::isfinite(sinusoidal_offset + sinusoidal_amplitude) ||
-                !std::isfinite(sinusoidal_offset - sinusoidal_amplitude) ||
-                !std::isfinite(2.0 * std::numbers::pi_v<double> / sinusoidal_period)) {
-                throw std::invalid_argument("Invalid sinusoidal modulation parameters");
-            }
-            return;
+            case ModulationKind::LegacySymmetric:
+                return;
+            case ModulationKind::MarkovTwoState:
+                validate_factors_();
+                if (!std::isfinite(gamma_a) || !std::isfinite(gamma_b) ||
+                    gamma_a <= 0.0 || gamma_b <= 0.0 ||
+                    !std::isfinite(gamma_a + gamma_b)) {
+                    throw std::invalid_argument(
+                        "Transition rates and their sum must be finite and positive"
+                    );
+                }
+                return;
+            case ModulationKind::PeriodicTwoState:
+                validate_factors_();
+                if (steps_a == 0 || steps_b == 0) {
+                    throw std::invalid_argument("Dwell steps must be positive");
+                }
+                return;
+            case ModulationKind::Constant:
+                if (!std::isfinite(constant_factor)) {
+                    throw std::invalid_argument("Constant factor must be finite");
+                }
+                return;
+            case ModulationKind::Sinusoidal:
+                if (!std::isfinite(sinusoidal_offset) ||
+                    !std::isfinite(sinusoidal_amplitude) ||
+                    sinusoidal_amplitude < 0.0 ||
+                    !std::isfinite(sinusoidal_period) || sinusoidal_period <= 0.0 ||
+                    !std::isfinite(sinusoidal_phase) ||
+                    !std::isfinite(sinusoidal_offset + sinusoidal_amplitude) ||
+                    !std::isfinite(sinusoidal_offset - sinusoidal_amplitude) ||
+                    !std::isfinite(2.0 * std::numbers::pi_v<double> / sinusoidal_period)) {
+                    throw std::invalid_argument("Invalid sinusoidal modulation parameters");
+                }
+                return;
 
             case ModulationKind::RectangularPeriodic:
                 validate_factors_();

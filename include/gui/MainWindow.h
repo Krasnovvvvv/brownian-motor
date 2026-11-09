@@ -40,64 +40,75 @@ class ModulationPanel;
 
 class MainWindow final : public QMainWindow {
 public:
-    explicit MainWindow(QWidget* parent = nullptr);
+    explicit MainWindow(QWidget *parent = nullptr);
+
     ~MainWindow() override;
 
 protected:
     bool eventFilter(
-        QObject* watched,
-        QEvent* event
+        QObject *watched,
+        QEvent *event
     ) override;
 
 private:
     void create_interface_();
+
     void connect_controls_();
 
     void log_experiment_event_(
-    const QString& event_name,
-    const QJsonObject& data = {}
+        const QString &event_name,
+        const QJsonObject &data = {}
     );
 
     [[nodiscard]] SimulationRequest request_from_controls_() const;
 
     [[nodiscard]] bool validate_request_(
-        const SimulationRequest& request,
-        QString& error_message
+        const SimulationRequest &request,
+        QString &error_message
     ) const;
 
     void start_simulation_();
+
     void cancel_simulation_();
 
     void show_trajectory_window_();
+
     void update_show_graph_button_();
 
     void begin_trend_selection_();
+
     void clear_trend_();
+
     void validate_burn_in_();
+
     void clear_burn_in_validation_();
+
     void update_plot_tools_();
 
     void export_trajectory_();
-    void export_trajectory_csv_(const QString& file_name);
+
+    void export_trajectory_csv_(const QString &file_name);
 
     void export_plot_image_(
-        const QString& file_name,
-        const QString& format
+        const QString &file_name,
+        const QString &format
     );
 
     void update_elapsed_time_();
+
     void set_running_state_(bool is_running);
-    void append_log_(const QString& message);
+
+    void append_log_(const QString &message);
 
     void load_potential_file_(
-        const QString& file_name
+        const QString &file_name
     );
 
     void use_builtin_potential_();
 
     void rebuild_potential_fields_(
-        const std::vector<PotentialParameterDefinition>&
-            parameters
+        const std::vector<PotentialParameterDefinition> &
+        parameters
     );
 
     [[nodiscard]] PotentialParameterValues
@@ -113,74 +124,74 @@ private:
         Invalid
     };
 
-    QPushButton* open_potential_button_{nullptr};
-    QPushButton* builtin_potential_button_{nullptr};
+    QPushButton *open_potential_button_{nullptr};
+    QPushButton *builtin_potential_button_{nullptr};
 
-    PotentialDropArea* potential_drop_area_{nullptr};
+    PotentialDropArea *potential_drop_area_{nullptr};
 
-    QLabel* potential_info_label_{nullptr};
+    QLabel *potential_info_label_{nullptr};
 
-    QScrollArea* potential_parameters_scroll_{nullptr};
-    QFormLayout* potential_parameters_form_{nullptr};
+    QScrollArea *potential_parameters_scroll_{nullptr};
+    QFormLayout *potential_parameters_form_{nullptr};
 
-    QHash<QString, QDoubleSpinBox*>
-        potential_parameter_spins_;
+    QHash<QString, QDoubleSpinBox *>
+    potential_parameter_spins_;
 
     std::optional<PotentialDefinition>
-        active_potential_definition_;
+    active_potential_definition_;
 
     PotentialState potential_state_{
         PotentialState::Invalid
     };
 
-    QDoubleSpinBox* dt_spin_{nullptr};
-    QDoubleSpinBox* total_time_spin_{nullptr};
-    QDoubleSpinBox* x0_spin_{nullptr};
+    QDoubleSpinBox *dt_spin_{nullptr};
+    QDoubleSpinBox *total_time_spin_{nullptr};
+    QDoubleSpinBox *x0_spin_{nullptr};
 
-    QSpinBox* particles_spin_{nullptr};
-    QSpinBox* burn_in_spin_{nullptr};
-    QSpinBox* seed_spin_{nullptr};
-    QSpinBox* workers_spin_{nullptr};
+    QSpinBox *particles_spin_{nullptr};
+    QSpinBox *burn_in_spin_{nullptr};
+    QSpinBox *seed_spin_{nullptr};
+    QSpinBox *workers_spin_{nullptr};
 
-    QComboBox* mode_combo_{nullptr};
-    QCheckBox* lookup_table_check_{nullptr};
+    QComboBox *mode_combo_{nullptr};
+    QCheckBox *lookup_table_check_{nullptr};
 
-    QPushButton* run_button_{nullptr};
-    QPushButton* cancel_button_{nullptr};
-    QPushButton* show_graph_button_{nullptr};
+    QPushButton *run_button_{nullptr};
+    QPushButton *cancel_button_{nullptr};
+    QPushButton *show_graph_button_{nullptr};
 
-    QPushButton* select_trend_button_{nullptr};
-    QPushButton* clear_trend_button_{nullptr};
+    QPushButton *select_trend_button_{nullptr};
+    QPushButton *clear_trend_button_{nullptr};
 
-    QCheckBox* highlight_trend_range_check_{nullptr};
+    QCheckBox *highlight_trend_range_check_{nullptr};
 
-    QPushButton* export_button_{nullptr};
-    QPushButton* validate_burn_in_button_{nullptr};
-    QPushButton* clear_burn_in_button_{nullptr};
+    QPushButton *export_button_{nullptr};
+    QPushButton *validate_burn_in_button_{nullptr};
+    QPushButton *clear_burn_in_button_{nullptr};
 
-    QProgressBar* progress_bar_{nullptr};
+    QProgressBar *progress_bar_{nullptr};
 
-    QLabel* status_label_{nullptr};
-    QLabel* elapsed_live_label_{nullptr};
+    QLabel *status_label_{nullptr};
+    QLabel *elapsed_live_label_{nullptr};
 
-    QLabel* velocity_value_label_{nullptr};
-    QLabel* final_x_value_label_{nullptr};
-    QLabel* elapsed_value_label_{nullptr};
-    QLabel* throughput_value_label_{nullptr};
-    QLabel* workers_value_label_{nullptr};
+    QLabel *velocity_value_label_{nullptr};
+    QLabel *final_x_value_label_{nullptr};
+    QLabel *elapsed_value_label_{nullptr};
+    QLabel *throughput_value_label_{nullptr};
+    QLabel *workers_value_label_{nullptr};
 
-    QLabel* trend_info_label_{nullptr};
-    QLabel* burn_in_info_label_{nullptr};
-    QSpinBox* burn_in_tolerance_spin_{nullptr};
+    QLabel *trend_info_label_{nullptr};
+    QLabel *burn_in_info_label_{nullptr};
+    QSpinBox *burn_in_tolerance_spin_{nullptr};
 
-    QPlainTextEdit* log_output_{nullptr};
+    QPlainTextEdit *log_output_{nullptr};
 
-    QDialog* trajectory_dialog_{nullptr};
-    TrajectoryPlotWidget* trajectory_plot_{nullptr};
+    QDialog *trajectory_dialog_{nullptr};
+    TrajectoryPlotWidget *trajectory_plot_{nullptr};
 
-    QThread* simulation_thread_{nullptr};
-    SimulationWorker* simulation_worker_{nullptr};
-    
+    QThread *simulation_thread_{nullptr};
+    SimulationWorker *simulation_worker_{nullptr};
+
     std::shared_ptr<std::stop_source> cancellation_source_;
 
     bool simulation_completed_{false};
@@ -190,8 +201,8 @@ private:
     QElapsedTimer elapsed_clock_;
 
     ExperimentLogger experiment_logger_;
-    ModulationPanel* modulation_panel_{nullptr};
-    QGroupBox* simulation_group_{nullptr};
+    ModulationPanel *modulation_panel_{nullptr};
+    QGroupBox *simulation_group_{nullptr};
 };
 
 #endif // BROWNIAN_MOTOR_MAINWINDOW_H

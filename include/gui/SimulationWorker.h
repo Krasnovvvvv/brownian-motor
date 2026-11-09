@@ -27,10 +27,10 @@ struct SimulationRequest final {
     * ExpressionEvaluator из JSON profile.
     */
     std::optional<PotentialDefinition>
-        potential_definition;
+    potential_definition;
 
     PotentialParameterValues
-        potential_parameter_values;
+    potential_parameter_values;
 
     double modulation_amplitude{1.0};
     double epsilon{0.10};
@@ -70,24 +70,24 @@ public:
     explicit SimulationWorker(
         SimulationRequest request,
         std::shared_ptr<std::stop_source> cancellation_source,
-        QObject* parent = nullptr
+        QObject *parent = nullptr
     );
 
 public slots:
     void run();
 
-    signals:
-        /*
-         * Этот сигнал испускается только в interactive mode,
-         * один раз на завершённый batch.
-         */
-        void progress_updated(
-            qulonglong completed_steps,
-            qulonglong total_steps,
-            double time,
-            double mean_x,
-            double mean_velocity
-        );
+signals:
+    /*
+     * Этот сигнал испускается только в interactive mode,
+     * один раз на завершённый batch.
+     */
+    void progress_updated(
+        qulonglong completed_steps,
+        qulonglong total_steps,
+        double time,
+        double mean_x,
+        double mean_velocity
+    );
 
     void completed(
         double mean_velocity,
@@ -97,18 +97,18 @@ public slots:
         std::size_t workers
     );
 
-    void failed(const QString& message);
+    void failed(const QString &message);
 
     void finished();
 
     void profile_prepared(
-        const QString& backend,
+        const QString &backend,
         qulonglong intervals,
         double preparation_seconds
     );
 
     void statistics_ready(
-        const QJsonObject& statistics
+        const QJsonObject &statistics
     );
 
 private:

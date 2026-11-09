@@ -13,16 +13,15 @@
 class RectangularModulation final {
 public:
     explicit RectangularModulation(
-        const ModulationSettings& settings,
+        const ModulationSettings &settings,
         double dt
     )
         : factor_a_{settings.factor_a}
-        , factor_b_{settings.factor_b}
-        , duration_a_{settings.rectangular_duration_a}
-        , duration_b_{settings.rectangular_duration_b}
-        , dt_{dt}
-        , current_factor_{settings.factor_a}
-    {
+          , factor_b_{settings.factor_b}
+          , duration_a_{settings.rectangular_duration_a}
+          , duration_b_{settings.rectangular_duration_b}
+          , dt_{dt}
+          , current_factor_{settings.factor_a} {
         settings.validate();
 
         if (settings.kind !=
@@ -50,32 +49,32 @@ public:
      */
     [[nodiscard]] double step() noexcept {
         const long double time =
-            static_cast<long double>(step_index_) *
-            dt_;
+                static_cast<long double>(step_index_) *
+                dt_;
 
         long double phase =
-            std::fmod(time, period_);
+                std::fmod(time, period_);
 
         /*
          * Snap values numerically indistinguishable
          * from switching boundaries.
          */
         const long double input_roundoff =
-            8.0L *
-            std::numeric_limits<double>::epsilon() *
-            period_;
+                8.0L *
+                std::numeric_limits<double>::epsilon() *
+                period_;
 
         const long double time_roundoff =
-            8.0L *
-            std::numeric_limits<long double>::epsilon() *
-            std::abs(time);
+                8.0L *
+                std::numeric_limits<long double>::epsilon() *
+                std::abs(time);
 
         const long double tolerance =
-            std::min(
-                input_roundoff + time_roundoff,
-                1.0e-6L *
+                std::min(
+                    input_roundoff + time_roundoff,
+                    1.0e-6L *
                     std::min(duration_a_, duration_b_)
-            );
+                );
 
         if (
             phase <= tolerance ||
@@ -89,9 +88,9 @@ public:
         }
 
         current_factor_ =
-            phase < duration_a_
-                ? factor_a_
-                : factor_b_;
+                phase < duration_a_
+                    ? factor_a_
+                    : factor_b_;
 
         ++step_index_;
 

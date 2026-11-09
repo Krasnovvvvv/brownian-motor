@@ -89,7 +89,7 @@ struct PotentialDefinition final {
     PotentialProfileDefinition profile;
 
     std::vector<PotentialParameterDefinition>
-        parameters;
+    parameters;
 };
 
 /*
@@ -104,6 +104,6 @@ struct PotentialDefinition final {
  * }
  */
 using PotentialParameterValues =
-    std::unordered_map<std::string, double>;
+std::unordered_map<std::string, double>;
 
 #endif // BROWNIAN_MOTOR_POTENTIALDEFINITION_H

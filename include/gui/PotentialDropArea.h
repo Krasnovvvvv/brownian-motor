@@ -14,30 +14,30 @@ class PotentialDropArea final : public QFrame {
 
 public:
     explicit PotentialDropArea(
-        QWidget* parent = nullptr
+        QWidget *parent = nullptr
     );
 
     void set_message(
-        const QString& message,
-        const QString& details = {}
+        const QString &message,
+        const QString &details = {}
     );
 
-    signals:
-        void file_dropped(
-            const QString& file_name
-        );
+signals:
+    void file_dropped(
+        const QString &file_name
+    );
 
 protected:
     void dragEnterEvent(
-        QDragEnterEvent* event
+        QDragEnterEvent *event
     ) override;
 
     void dropEvent(
-        QDropEvent* event
+        QDropEvent *event
     ) override;
 
 private:
-    QLabel* message_label_{nullptr};
+    QLabel *message_label_{nullptr};
 };
 
 #endif // BROWNIAN_MOTOR_POTENTIALDROPAREA_H

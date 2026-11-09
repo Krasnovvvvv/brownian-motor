@@ -6,23 +6,21 @@
 #include <string>
 
 namespace {
+    [[nodiscard]] bool approximately_equal(
+        double left,
+        double right,
+        double tolerance = 1.0e-12
+    ) {
+        return std::abs(left - right) <= tolerance;
+    }
 
-[[nodiscard]] bool approximately_equal(
-    double left,
-    double right,
-    double tolerance = 1.0e-12
-) {
-    return std::abs(left - right) <= tolerance;
-}
+    int fail(
+        const std::string &message
+    ) {
+        std::cerr << message << '\n';
 
-int fail(
-    const std::string& message
-) {
-    std::cerr << message << '\n';
-
-    return 1;
-}
-
+        return 1;
+    }
 } // namespace
 
 int main() {
@@ -33,8 +31,8 @@ int main() {
             .id = "exprtk-smoke-test",
             .name = "ExprTk smoke test",
             .description =
-                "Checks powers, functions, whitespace "
-                "and a custom coordinate symbol.",
+            "Checks powers, functions, whitespace "
+            "and a custom coordinate symbol.",
 
             .coordinate = PotentialCoordinateDefinition{
                 .symbol = "z",
@@ -43,19 +41,19 @@ int main() {
 
             .profile = PotentialProfileDefinition{
                 .expression =
-                    " A  * pow( z , p )  + "
-                    " B * sin( z ) ^ 2 + "
-                    " C * cos( z ) + "
-                    " D * exp( z ) + "
-                    " E * sqrt( abs( z ) ) ",
+                " A  * pow( z , p )  + "
+                " B * sin( z ) ^ 2 + "
+                " C * cos( z ) + "
+                " D * exp( z ) + "
+                " E * sqrt( abs( z ) ) ",
 
                 .derivative_expression =
-                    " A * p * z ^ ( p - 1 ) + "
-                    " 2 * B * sin( z ) * cos( z ) - "
-                    " C * sin( z ) + "
-                    " D * exp( z ) + "
-                    " E * z / "
-                    " ( 2 * abs( z ) * sqrt( abs( z ) ) ) ",
+                " A * p * z ^ ( p - 1 ) + "
+                " 2 * B * sin( z ) * cos( z ) - "
+                " C * sin( z ) + "
+                " D * exp( z ) + "
+                " E * z / "
+                " ( 2 * abs( z ) * sqrt( abs( z ) ) ) ",
 
                 .periodic = false,
                 .period = 0.0
@@ -131,10 +129,10 @@ int main() {
         constexpr double z = 2.0;
 
         const double profile_value =
-            evaluator.value(z);
+                evaluator.value(z);
 
         const double derivative_value =
-            evaluator.derivative(z);
+                evaluator.derivative(z);
 
         /*
          * U(z) = A * z^p = 3 * 2^2 = 12.
@@ -168,10 +166,10 @@ int main() {
         }
 
         std::cout
-            << "ExprTk smoke test passed.\n";
+                << "ExprTk smoke test passed.\n";
 
         return 0;
-    } catch (const std::exception& exception) {
+    } catch (const std::exception &exception) {
         return fail(
             std::string{
                 "ExprTk smoke test failed: "

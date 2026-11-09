@@ -31,7 +31,7 @@ struct SinusoidalModulation {
             !std::isfinite(offset - std::abs(amplitude)) ||
             !std::isfinite(omega * initial_time + phase)) {
             throw std::invalid_argument("Invalid sinusoidal modulation parameters");
-            }
+        }
         factor = offset + amplitude * std::sin(omega * time + phase);
     }
 

@@ -8,10 +8,10 @@
 class CompactDoubleSpinBox final : public QDoubleSpinBox {
 public:
     explicit CompactDoubleSpinBox(
-        QWidget* parent = nullptr
+        QWidget *parent = nullptr
     )
-        : QDoubleSpinBox{parent}
-    {}
+        : QDoubleSpinBox{parent} {
+    }
 
 protected:
     [[nodiscard]] QString textFromValue(

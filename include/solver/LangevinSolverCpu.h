@@ -27,13 +27,14 @@ struct alignas(64) PaddedReduction final {
     double burn_in_position_sum{0.0};
 };
 
-template <typename Modulation>
+template<typename Modulation>
 concept ModulationProcess =
-    requires(Modulation modulation) {
-        { modulation.step() } noexcept -> std::convertible_to<double>;
-    };
+        requires(Modulation modulation)
+        {
+            { modulation.step() } noexcept -> std::convertible_to<double>;
+        };
 
-template <typename Profile>
+template<typename Profile>
 class LangevinSolverCpu final {
 public:
     LangevinSolverCpu(
@@ -43,14 +44,13 @@ public:
         std::size_t requested_workers = std::thread::hardware_concurrency()
     )
         : potential_{std::move(potential)}
-        , params_{params}
-        , seeds_{seeds}
-    {
+          , params_{params}
+          , seeds_{seeds} {
         params_.validate();
 
         if (requested_workers == 0) {
             requested_workers =
-                std::thread::hardware_concurrency();
+                    std::thread::hardware_concurrency();
         }
 
         requested_workers_ = std::max(
@@ -61,9 +61,9 @@ public:
         sqrt_2dt_ = std::sqrt(2.0 * params_.dt);
     }
 
-    template <ModulationProcess Modulation>
+    template<ModulationProcess Modulation>
     [[nodiscard]] EnsembleResult solve_stochastic_fast(
-        std::vector<Modulation>& modulations,
+        std::vector<Modulation> &modulations,
         std::stop_token stop_token = {}
     ) const {
         if (modulations.size() != params_.n_particles) {
@@ -76,18 +76,17 @@ public:
 
         return solve_fast_(
             [&modulations](
-                std::size_t particle,
-                std::size_t
-            ) noexcept {
+        std::size_t particle,
+        std::size_t) noexcept {
                 return modulations[particle].step();
             },
             stop_token
         );
     }
 
-    template <ModulationProcess Modulation>
+    template<ModulationProcess Modulation>
     [[nodiscard]] EnsembleResult solve_deterministic_fast(
-        Modulation& modulation,
+        Modulation &modulation,
         std::stop_token stop_token = {}
     ) const {
         ensure_fast_mode_();
@@ -104,19 +103,19 @@ public:
 
         return solve_fast_(
             [&factors](
-                std::size_t,
-                std::size_t step
-            ) noexcept {
+        std::size_t,
+        std::size_t step
+    ) noexcept {
                 return factors[step];
             },
             stop_token
         );
     }
-    
-    template <ModulationProcess Modulation>
+
+    template<ModulationProcess Modulation>
     [[nodiscard]] EnsembleResult solve_stochastic_interactive(
-        std::vector<Modulation>& modulations,
-        const SimulationObserver& observer = {},
+        std::vector<Modulation> &modulations,
+        const SimulationObserver &observer = {},
         std::stop_token stop_token = {}
     ) const {
         if (modulations.size() != params_.n_particles) {
@@ -127,9 +126,8 @@ public:
 
         return solve_interactive_(
             [&modulations](
-                std::size_t particle,
-                std::size_t
-            ) noexcept {
+        std::size_t particle,
+        std::size_t) noexcept {
                 return modulations[particle].step();
             },
             observer,
@@ -137,15 +135,15 @@ public:
         );
     }
 
-    template <ModulationProcess Modulation>
+    template<ModulationProcess Modulation>
     [[nodiscard]]
     EnsembleResult solve_deterministic_interactive(
-        Modulation& modulation,
-        const SimulationObserver& observer = {},
+        Modulation &modulation,
+        const SimulationObserver &observer = {},
         std::stop_token stop_token = {}
     ) const {
         const std::size_t total_steps =
-            params_.step_count();
+                params_.step_count();
 
         std::vector<double> factors(total_steps);
 
@@ -159,9 +157,9 @@ public:
 
         return solve_interactive_(
             [&factors](
-                std::size_t,
-                std::size_t step
-            ) noexcept {
+        std::size_t,
+        std::size_t step
+    ) noexcept {
                 return factors[step];
             },
             observer,
@@ -169,17 +167,17 @@ public:
         );
     }
 
-    template <ModulationProcess Modulation>
+    template<ModulationProcess Modulation>
     [[nodiscard]] EnsembleResult solve_stochastic(
-        std::vector<Modulation>& modulations,
+        std::vector<Modulation> &modulations,
         std::stop_token stop_token = {}
     ) const {
         return solve_stochastic_fast(modulations, stop_token);
     }
 
-    template <ModulationProcess Modulation>
+    template<ModulationProcess Modulation>
     [[nodiscard]] EnsembleResult solve_deterministic(
-        Modulation& modulation,
+        Modulation &modulation,
         std::stop_token stop_token = {}
     ) const {
         return solve_deterministic_fast(modulation, stop_token);
@@ -192,7 +190,7 @@ private:
 
         double position{};
 
-        const char* reason{};
+        const char *reason{};
     };
 
     struct SimulationState final {
@@ -203,16 +201,16 @@ private:
 
         std::vector<std::mt19937> gaussian_rngs;
 
-        std::vector<std::normal_distribution<double>>
-            gaussian_distributions;
+        std::vector<std::normal_distribution<double> >
+        gaussian_distributions;
     };
 
     static void throw_if_numerical_failure_(
         const std::vector<
             std::optional<NumericalFailure>
-        >& failures
+        > &failures
     ) {
-        for (const auto& failure : failures) {
+        for (const auto &failure: failures) {
             if (!failure) {
                 continue;
             }
@@ -240,12 +238,12 @@ private:
         }
     }
 
-    [[nodiscard]] std::vector<Potential<Profile>>
+    [[nodiscard]] std::vector<Potential<Profile> >
     make_worker_potentials_(
         std::size_t worker_count
     ) const {
-        std::vector<Potential<Profile>>
-            worker_potentials;
+        std::vector<Potential<Profile> >
+                worker_potentials;
 
         worker_potentials.reserve(worker_count);
 
@@ -328,10 +326,10 @@ private:
         return state;
     }
 
-    template <typename FactorProvider>
+    template<typename FactorProvider>
     [[nodiscard]] EnsembleResult solve_fast_(
         FactorProvider factor_provider,
-        const std::stop_token& stop_token
+        const std::stop_token &stop_token
     ) const {
         const std::size_t total_steps = params_.step_count();
         const std::size_t active_workers = worker_count_();
@@ -343,11 +341,11 @@ private:
 
         SimulationState state = make_initial_state_();
 
-        std::vector<Potential<Profile>>
-            worker_potentials =
-                make_worker_potentials_(
-                    active_workers
-                );
+        std::vector<Potential<Profile> >
+                worker_potentials =
+                        make_worker_potentials_(
+                            active_workers
+                        );
 
         std::atomic<bool> cancellation_requested{false};
 
@@ -362,8 +360,8 @@ private:
         );
 
         const std::size_t particles_per_worker =
-            (params_.n_particles + active_workers - 1) /
-            active_workers;
+                (params_.n_particles + active_workers - 1) /
+                active_workers;
 
         std::vector<std::jthread> workers;
         workers.reserve(active_workers);
@@ -372,7 +370,7 @@ private:
              worker < active_workers;
              ++worker) {
             const std::size_t first_particle =
-                worker * particles_per_worker;
+                    worker * particles_per_worker;
 
             const std::size_t last_particle = std::min(
                 params_.n_particles,
@@ -381,50 +379,50 @@ private:
 
             workers.emplace_back(
                 [this,
-                 &state,
-                 &worker_potentials,
-                 &partial_results,
-                 &numerical_failures,
-                 &cancellation_requested,
-                 factor_provider,
-                 stop_token,
-                 first_particle,
-                 last_particle,
-                 worker,
-                 total_steps,
-                 burn_in_steps](const std::stop_token&) mutable {
-                     const Potential<Profile>& worker_potential =
-                         worker_potentials[worker];
+                    &state,
+                    &worker_potentials,
+                    &partial_results,
+                    &numerical_failures,
+                    &cancellation_requested,
+                    factor_provider,
+                    stop_token,
+                    first_particle,
+                    last_particle,
+                    worker,
+                    total_steps,
+                    burn_in_steps](const std::stop_token &) mutable {
+                    const Potential<Profile> &worker_potential =
+                            worker_potentials[worker];
                     double local_final_sum = 0.0;
                     double local_burn_in_sum = 0.0;
 
                     for (std::size_t particle = first_particle;
                          particle < last_particle;
                          ++particle) {
-                        double& x_unwrapped =
-                            state.x_unwrapped[particle];
+                        double &x_unwrapped =
+                                state.x_unwrapped[particle];
 
-                        double& x_wrapped =
-                            state.x_wrapped[particle];
+                        double &x_wrapped =
+                                state.x_wrapped[particle];
 
-                        std::mt19937& gaussian_rng =
-                            state.gaussian_rngs[particle];
+                        std::mt19937 &gaussian_rng =
+                                state.gaussian_rngs[particle];
 
-                        std::normal_distribution<double>&
-                            gaussian_distribution =
+                        std::normal_distribution<double> &
+                                gaussian_distribution =
                                 state.gaussian_distributions[
                                     particle
                                 ];
 
-                        double& x_at_burn_in = state.x_at_burn_in[particle];
+                        double &x_at_burn_in = state.x_at_burn_in[particle];
                         double local_integrated_drift =
-                            state.integrated_drift[particle];
+                                state.integrated_drift[particle];
 
                         for (std::size_t step = 0;
                              step < total_steps;
                              ++step) {
                             if (step % params_.cancellation_check_steps ==
-                                    0 &&
+                                0 &&
                                 stop_token.stop_requested()) {
                                 cancellation_requested.store(
                                     true,
@@ -434,13 +432,13 @@ private:
                             }
 
                             const double factor =
-                                factor_provider(particle, step);
+                                    factor_provider(particle, step);
 
                             const double previous_x =
-                                x_unwrapped;
+                                    x_unwrapped;
 
-                            const char* failure_reason =
-                                nullptr;
+                            const char *failure_reason =
+                                    nullptr;
 
                             if (
                                 !advance_particle_(
@@ -455,12 +453,12 @@ private:
                                 )
                             ) {
                                 numerical_failures[worker] =
-                                    NumericalFailure{
-                                        .particle = particle,
-                                        .step = step,
-                                        .position = previous_x,
-                                        .reason = failure_reason
-                                    };
+                                        NumericalFailure{
+                                            .particle = particle,
+                                            .step = step,
+                                            .position = previous_x,
+                                            .reason = failure_reason
+                                        };
 
                                 break;
                             }
@@ -472,7 +470,7 @@ private:
                         }
 
                         state.integrated_drift[particle] =
-                            local_integrated_drift;
+                                local_integrated_drift;
 
                         if (numerical_failures[worker]) {
                             break;
@@ -483,10 +481,10 @@ private:
                     }
 
                     partial_results[worker].final_position_sum =
-                        local_final_sum;
+                            local_final_sum;
 
                     partial_results[worker].burn_in_position_sum =
-                        local_burn_in_sum;
+                            local_burn_in_sum;
                 }
             );
         }
@@ -500,20 +498,20 @@ private:
         double final_position_sum = 0.0;
         double burn_in_position_sum = 0.0;
 
-        for (const PaddedReduction& partial : partial_results) {
+        for (const PaddedReduction &partial: partial_results) {
             final_position_sum += partial.final_position_sum;
             burn_in_position_sum +=
-                partial.burn_in_position_sum;
+                    partial.burn_in_position_sum;
         }
 
         const double particle_count =
-            static_cast<double>(params_.n_particles);
+                static_cast<double>(params_.n_particles);
 
         const double mean_x_final =
-            final_position_sum / particle_count;
+                final_position_sum / particle_count;
 
         const double mean_x_burn_in =
-            burn_in_position_sum / particle_count;
+                burn_in_position_sum / particle_count;
 
         EnsembleResult result;
         result.n_particles = params_.n_particles;
@@ -521,24 +519,24 @@ private:
         result.mean_x_final = mean_x_final;
 
         if (cancellation_requested.load(
-                std::memory_order_acquire)) {
+            std::memory_order_acquire)) {
             result.mean_velocity = 0.0;
             return result;
         }
 
         const double measurement_time =
-            static_cast<double>(
-                total_steps - burn_in_steps
-            ) * params_.dt;
+                static_cast<double>(
+                    total_steps - burn_in_steps
+                ) * params_.dt;
 
         result.mean_velocity =
-            measurement_time > 0.0
-                ? (mean_x_final - mean_x_burn_in) /
-                  measurement_time
-                : 0.0;
+                measurement_time > 0.0
+                    ? (mean_x_final - mean_x_burn_in) /
+                      measurement_time
+                    : 0.0;
 
         populate_statistics_(
-           result,
+            result,
             state,
             total_steps - burn_in_steps
         );
@@ -546,11 +544,11 @@ private:
         return result;
     }
 
-    template <typename FactorProvider>
+    template<typename FactorProvider>
     [[nodiscard]] EnsembleResult solve_interactive_(
         FactorProvider factor_provider,
-        const SimulationObserver& observer,
-        const std::stop_token& stop_token
+        const SimulationObserver &observer,
+        const std::stop_token &stop_token
     ) const {
         const std::size_t total_steps = params_.step_count();
         const std::size_t active_workers = worker_count_();
@@ -561,16 +559,16 @@ private:
         );
 
         const std::size_t particles_per_worker =
-            (params_.n_particles + active_workers - 1) /
-            active_workers;
+                (params_.n_particles + active_workers - 1) /
+                active_workers;
 
         SimulationState state = make_initial_state_();
 
-        std::vector<Potential<Profile>>
-            worker_potentials =
-                make_worker_potentials_(
-                    active_workers
-                );
+        std::vector<Potential<Profile> >
+                worker_potentials =
+                        make_worker_potentials_(
+                            active_workers
+                        );
 
         EnsembleResult result;
         result.n_particles = params_.n_particles;
@@ -578,15 +576,15 @@ private:
 
         if (params_.store_trajectory) {
             const std::size_t point_count =
-                (total_steps + params_.batch_steps - 1) /
-                params_.batch_steps;
+                    (total_steps + params_.batch_steps - 1) /
+                    params_.batch_steps;
 
             result.sim_time.reserve(point_count);
             result.mean_x.reserve(point_count);
         }
 
         const double particle_count =
-            static_cast<double>(params_.n_particles);
+                static_cast<double>(params_.n_particles);
 
         double mean_x_burn_in = params_.x0;
         double mean_x_current = params_.x0;
@@ -618,7 +616,7 @@ private:
                  worker < active_workers;
                  ++worker) {
                 const std::size_t first_particle =
-                    worker * particles_per_worker;
+                        worker * particles_per_worker;
 
                 const std::size_t last_particle = std::min(
                     params_.n_particles,
@@ -627,54 +625,54 @@ private:
 
                 workers.emplace_back(
                     [this,
-                     &state,
-                     &worker_potentials,
-                     &numerical_failures,
-                     &partial_results,
-                     &cancellation_requested,
-                     factor_provider,
-                     stop_token,
-                     first_particle,
-                     last_particle,
-                     worker,
-                     batch_begin,
-                     batch_end,
-                     burn_in_steps](
-                        const std::stop_token&
-                    ) mutable {
-                        const Potential<Profile>& worker_potential =
-                            worker_potentials[worker];
+                        &state,
+                        &worker_potentials,
+                        &numerical_failures,
+                        &partial_results,
+                        &cancellation_requested,
+                        factor_provider,
+                        stop_token,
+                        first_particle,
+                        last_particle,
+                        worker,
+                        batch_begin,
+                        batch_end,
+                        burn_in_steps](
+                const std::stop_token &
+            ) mutable {
+                        const Potential<Profile> &worker_potential =
+                                worker_potentials[worker];
                         double local_final_sum = 0.0;
                         double local_burn_in_sum = 0.0;
 
                         for (std::size_t particle = first_particle;
                              particle < last_particle;
                              ++particle) {
-                            double& x_unwrapped =
-                                state.x_unwrapped[particle];
+                            double &x_unwrapped =
+                                    state.x_unwrapped[particle];
 
-                            double& x_wrapped =
-                                state.x_wrapped[particle];
+                            double &x_wrapped =
+                                    state.x_wrapped[particle];
 
-                            std::mt19937& gaussian_rng =
-                                state.gaussian_rngs[particle];
+                            std::mt19937 &gaussian_rng =
+                                    state.gaussian_rngs[particle];
 
-                            std::normal_distribution<double>&
-                                gaussian_distribution =
+                            std::normal_distribution<double> &
+                                    gaussian_distribution =
                                     state.gaussian_distributions[
                                         particle
                                     ];
 
-                            double& x_at_burn_in = state.x_at_burn_in[particle];
+                            double &x_at_burn_in = state.x_at_burn_in[particle];
                             double local_integrated_drift =
-                                state.integrated_drift[particle];
+                                    state.integrated_drift[particle];
 
                             for (std::size_t step = batch_begin;
                                  step < batch_end;
                                  ++step) {
                                 if (step %
-                                        params_.cancellation_check_steps ==
-                                        0 &&
+                                    params_.cancellation_check_steps ==
+                                    0 &&
                                     stop_token.stop_requested()) {
                                     cancellation_requested.store(
                                         true,
@@ -684,16 +682,16 @@ private:
                                 }
 
                                 const double factor =
-                                    factor_provider(
-                                        particle,
-                                        step
-                                    );
+                                        factor_provider(
+                                            particle,
+                                            step
+                                        );
 
                                 const double previous_x =
-                                    x_unwrapped;
+                                        x_unwrapped;
 
-                                const char* failure_reason =
-                                    nullptr;
+                                const char *failure_reason =
+                                        nullptr;
 
                                 if (
                                     !advance_particle_(
@@ -708,12 +706,12 @@ private:
                                     )
                                 ) {
                                     numerical_failures[worker] =
-                                        NumericalFailure{
-                                            .particle = particle,
-                                            .step = step,
-                                            .position = previous_x,
-                                            .reason = failure_reason
-                                        };
+                                            NumericalFailure{
+                                                .particle = particle,
+                                                .step = step,
+                                                .position = previous_x,
+                                                .reason = failure_reason
+                                            };
 
                                     break;
                                 }
@@ -725,7 +723,7 @@ private:
                             }
 
                             state.integrated_drift[particle] =
-                                local_integrated_drift;
+                                    local_integrated_drift;
 
                             if (numerical_failures[worker]) {
                                 break;
@@ -736,15 +734,15 @@ private:
                             if (batch_begin < burn_in_steps &&
                                 burn_in_steps <= batch_end) {
                                 local_burn_in_sum +=
-                                    x_at_burn_in;
+                                        x_at_burn_in;
                             }
                         }
 
                         partial_results[worker].final_position_sum =
-                            local_final_sum;
+                                local_final_sum;
 
                         partial_results[worker].burn_in_position_sum =
-                            local_burn_in_sum;
+                                local_burn_in_sum;
                     }
                 );
             }
@@ -756,7 +754,7 @@ private:
             );
 
             if (cancellation_requested.load(
-                    std::memory_order_acquire)) {
+                std::memory_order_acquire)) {
                 result.mean_x_final = mean_x_current;
                 result.mean_velocity = 0.0;
                 return result;
@@ -765,38 +763,38 @@ private:
             double final_position_sum = 0.0;
             double burn_in_position_sum = 0.0;
 
-            for (const PaddedReduction& partial : partial_results) {
+            for (const PaddedReduction &partial: partial_results) {
                 final_position_sum += partial.final_position_sum;
                 burn_in_position_sum +=
-                    partial.burn_in_position_sum;
+                        partial.burn_in_position_sum;
             }
 
             mean_x_current =
-                final_position_sum / particle_count;
+                    final_position_sum / particle_count;
 
             const std::size_t completed_steps = batch_end;
 
             if (batch_begin < burn_in_steps &&
                 burn_in_steps <= batch_end) {
                 mean_x_burn_in =
-                    burn_in_position_sum / particle_count;
+                        burn_in_position_sum / particle_count;
             }
 
             const double current_time =
-                static_cast<double>(completed_steps) *
-                params_.dt;
+                    static_cast<double>(completed_steps) *
+                    params_.dt;
 
             double mean_velocity = 0.0;
 
             if (completed_steps > burn_in_steps) {
                 const double measurement_time =
-                    static_cast<double>(
-                        completed_steps - burn_in_steps
-                    ) * params_.dt;
+                        static_cast<double>(
+                            completed_steps - burn_in_steps
+                        ) * params_.dt;
 
                 mean_velocity =
-                    (mean_x_current - mean_x_burn_in) /
-                    measurement_time;
+                        (mean_x_current - mean_x_burn_in) /
+                        measurement_time;
             }
 
             if (params_.store_trajectory) {
@@ -820,15 +818,15 @@ private:
         result.mean_x_final = mean_x_current;
 
         const double measurement_time =
-            static_cast<double>(
-                total_steps - burn_in_steps
-            ) * params_.dt;
+                static_cast<double>(
+                    total_steps - burn_in_steps
+                ) * params_.dt;
 
         result.mean_velocity =
-            measurement_time > 0.0
-                ? (mean_x_current - mean_x_burn_in) /
-                  measurement_time
-                : 0.0;
+                measurement_time > 0.0
+                    ? (mean_x_current - mean_x_burn_in) /
+                      measurement_time
+                    : 0.0;
 
         populate_statistics_(
             result,
@@ -839,13 +837,13 @@ private:
         return result;
     }
 
-        void populate_statistics_(
-        EnsembleResult& result,
-        const SimulationState& state,
+    void populate_statistics_(
+        EnsembleResult &result,
+        const SimulationState &state,
         std::size_t measurement_steps
     ) const {
         const std::size_t count =
-            state.x_unwrapped.size();
+                state.x_unwrapped.size();
 
         if (
             state.x_at_burn_in.size() != count ||
@@ -862,8 +860,8 @@ private:
         }
 
         const double measurement_time =
-            static_cast<double>(measurement_steps) *
-            params_.dt;
+                static_cast<double>(measurement_steps) *
+                params_.dt;
 
         if (
             !std::isfinite(measurement_time) ||
@@ -890,8 +888,8 @@ private:
             ++particle
         ) {
             const double displacement =
-                state.x_unwrapped[particle] -
-                state.x_at_burn_in[particle];
+                    state.x_unwrapped[particle] -
+                    state.x_at_burn_in[particle];
 
             if (!std::isfinite(displacement)) {
                 throw std::runtime_error(
@@ -901,20 +899,20 @@ private:
             }
 
             const double sample_count =
-                static_cast<double>(particle + 1);
+                    static_cast<double>(particle + 1);
 
             const double delta =
-                displacement - mean;
+                    displacement - mean;
 
             mean += delta / sample_count;
 
             const double delta_after_update =
-                displacement - mean;
+                    displacement - mean;
 
             m2 += delta * delta_after_update;
 
             const double drift_displacement =
-                state.integrated_drift[particle];
+                    state.integrated_drift[particle];
 
             if (!std::isfinite(drift_displacement)) {
                 throw std::runtime_error(
@@ -924,17 +922,17 @@ private:
             }
 
             const double drift_delta =
-                drift_displacement - drift_mean;
+                    drift_displacement - drift_mean;
 
             drift_mean +=
-                drift_delta / sample_count;
+                    drift_delta / sample_count;
 
             const double drift_delta_after_update =
-                drift_displacement - drift_mean;
+                    drift_displacement - drift_mean;
 
             drift_m2 +=
-                drift_delta *
-                drift_delta_after_update;
+                    drift_delta *
+                    drift_delta_after_update;
         }
 
         if (
@@ -947,36 +945,36 @@ private:
         }
 
         const double n =
-            static_cast<double>(count);
+                static_cast<double>(count);
 
         const double nonnegative_m2 =
-            std::max(0.0, m2);
+                std::max(0.0, m2);
 
         const double sample_variance =
-            nonnegative_m2 / (n - 1.0);
+                nonnegative_m2 / (n - 1.0);
 
         const double mean_squared_displacement =
-            nonnegative_m2 / n +
-            mean * mean;
+                nonnegative_m2 / n +
+                mean * mean;
 
         const double velocity =
-            mean / measurement_time;
+                mean / measurement_time;
 
         const double standard_error =
-            std::sqrt(sample_variance / n) /
-            measurement_time;
+                std::sqrt(sample_variance / n) /
+                measurement_time;
 
         constexpr double normal_95 =
-            1.959963984540054;
+                1.959963984540054;
 
         const double margin =
-            normal_95 * standard_error;
+                normal_95 * standard_error;
 
         const double lower =
-            velocity - margin;
+                velocity - margin;
 
         const double upper =
-            velocity + margin;
+                velocity + margin;
 
         if (
             !std::isfinite(sample_variance) ||
@@ -992,35 +990,35 @@ private:
         }
 
         result.measurement_time =
-            measurement_time;
+                measurement_time;
 
         result.mean_displacement =
-            mean;
+                mean;
 
         result.displacement_variance =
-            sample_variance;
+                sample_variance;
 
         result.mean_squared_displacement =
-            mean_squared_displacement;
+                mean_squared_displacement;
 
         /*
          * Use the same displacement mean for both
          * velocity and its uncertainty.
          */
         result.mean_velocity =
-            velocity;
+                velocity;
 
         result.velocity_standard_error =
-            standard_error;
+                standard_error;
 
         result.velocity_ci95_lower =
-            lower;
+                lower;
 
         result.velocity_ci95_upper =
-            upper;
+                upper;
 
         result.has_velocity_statistics =
-            true;
+                true;
 
         if (
             !std::isfinite(drift_mean) ||
@@ -1032,27 +1030,27 @@ private:
         }
 
         const double drift_variance =
-            std::max(0.0, drift_m2) /
-            (n - 1.0);
+                std::max(0.0, drift_m2) /
+                (n - 1.0);
 
         const double cv_velocity =
-            drift_mean / measurement_time;
+                drift_mean / measurement_time;
 
         const double cv_standard_error =
-            std::sqrt(drift_variance / n) /
-            measurement_time;
+                std::sqrt(drift_variance / n) /
+                measurement_time;
 
         const double cv_margin =
-            normal_95 * cv_standard_error;
+                normal_95 * cv_standard_error;
 
         const double cv_lower =
-            cv_velocity - cv_margin;
+                cv_velocity - cv_margin;
 
         const double cv_upper =
-            cv_velocity + cv_margin;
+                cv_velocity + cv_margin;
 
         const double thermal_velocity =
-            result.mean_velocity - cv_velocity;
+                result.mean_velocity - cv_velocity;
 
         if (
             !std::isfinite(drift_variance) ||
@@ -1068,167 +1066,166 @@ private:
         }
 
         result.control_variate_velocity =
-            cv_velocity;
+                cv_velocity;
 
         result.control_variate_standard_error =
-            cv_standard_error;
+                cv_standard_error;
 
         result.control_variate_ci95_lower =
-            cv_lower;
+                cv_lower;
 
         result.control_variate_ci95_upper =
-            cv_upper;
+                cv_upper;
 
         result.integrated_drift_variance =
-            drift_variance;
+                drift_variance;
 
         result.mean_thermal_velocity =
-            thermal_velocity;
+                thermal_velocity;
 
         result.has_control_variate_statistics =
-            true;
-
+                true;
     }
 
     [[nodiscard]] bool advance_particle_(
-        const Potential<Profile>& potential,
-        double& x_unwrapped,
-        double& x_wrapped,
-        std::mt19937& gaussian_rng,
-        std::normal_distribution<double>&
-            gaussian_distribution,
+        const Potential<Profile> &potential,
+        double &x_unwrapped,
+        double &x_wrapped,
+        std::mt19937 &gaussian_rng,
+        std::normal_distribution<double> &
+        gaussian_distribution,
         double factor,
-        double& integrated_drift,
-        const char*& failure_reason
+        double &integrated_drift,
+        const char *&failure_reason
     ) const noexcept {
-    failure_reason = nullptr;
+        failure_reason = nullptr;
 
-    if (!std::isfinite(factor)) {
-        failure_reason =
-            "modulation factor is not finite";
+        if (!std::isfinite(factor)) {
+            failure_reason =
+                    "modulation factor is not finite";
 
-        return false;
-    }
+            return false;
+        }
 
-    const double thermal_increment =
-        sqrt_2dt_ *
-        gaussian_distribution(
-            gaussian_rng
-        );
+        const double thermal_increment =
+                sqrt_2dt_ *
+                gaussian_distribution(
+                    gaussian_rng
+                );
 
-    if (!std::isfinite(thermal_increment)) {
-        failure_reason =
-            "thermal increment is not finite";
+        if (!std::isfinite(thermal_increment)) {
+            failure_reason =
+                    "thermal increment is not finite";
 
-        return false;
-    }
+            return false;
+        }
 
-    const double derivative_now =
-        potential.derivative_value(
-            x_wrapped,
-            factor
-        );
+        const double derivative_now =
+                potential.derivative_value(
+                    x_wrapped,
+                    factor
+                );
 
-    if (!std::isfinite(derivative_now)) {
-        failure_reason =
-            "potential derivative at "
-            "current position is not finite";
+        if (!std::isfinite(derivative_now)) {
+            failure_reason =
+                    "potential derivative at "
+                    "current position is not finite";
 
-        return false;
-    }
+            return false;
+        }
 
-    const double predicted_x =
-        x_unwrapped -
-        derivative_now * params_.dt +
-        thermal_increment;
+        const double predicted_x =
+                x_unwrapped -
+                derivative_now * params_.dt +
+                thermal_increment;
 
-    if (!std::isfinite(predicted_x)) {
-        failure_reason =
-            "predicted position is not finite";
+        if (!std::isfinite(predicted_x)) {
+            failure_reason =
+                    "predicted position is not finite";
 
-        return false;
-    }
+            return false;
+        }
 
-    const double predicted_coordinate =
-        evaluation_coordinate_(
-            predicted_x
-        );
+        const double predicted_coordinate =
+                evaluation_coordinate_(
+                    predicted_x
+                );
 
-    if (
-        !std::isfinite(
-            predicted_coordinate
-        )
-    ) {
-        failure_reason =
-            "wrapped predicted position "
-            "is not finite";
+        if (
+            !std::isfinite(
+                predicted_coordinate
+            )
+        ) {
+            failure_reason =
+                    "wrapped predicted position "
+                    "is not finite";
 
-        return false;
-    }
+            return false;
+        }
 
-    const double derivative_predicted =
-        potential.derivative_value(
-            predicted_coordinate,
-            factor
-        );
+        const double derivative_predicted =
+                potential.derivative_value(
+                    predicted_coordinate,
+                    factor
+                );
 
-    if (
-        !std::isfinite(
-            derivative_predicted
-        )
-    ) {
-        failure_reason =
-            "potential derivative at "
-            "predicted position is not finite";
+        if (
+            !std::isfinite(
+                derivative_predicted
+            )
+        ) {
+            failure_reason =
+                    "potential derivative at "
+                    "predicted position is not finite";
 
-        return false;
-    }
+            return false;
+        }
 
         const double drift_increment =
-            -0.5 *
-            (
-                derivative_now +
-                derivative_predicted
-            ) *
-            params_.dt;
+                -0.5 *
+                (
+                    derivative_now +
+                    derivative_predicted
+                ) *
+                params_.dt;
 
         const double delta_x =
-            drift_increment +
-            thermal_increment;
+                drift_increment +
+                thermal_increment;
 
-    if (!std::isfinite(delta_x)) {
-        failure_reason =
-            "position increment is not finite";
+        if (!std::isfinite(delta_x)) {
+            failure_reason =
+                    "position increment is not finite";
 
-        return false;
-    }
+            return false;
+        }
 
-    const double next_x =
-        x_unwrapped + delta_x;
+        const double next_x =
+                x_unwrapped + delta_x;
 
-    if (!std::isfinite(next_x)) {
-        failure_reason =
-            "new position is not finite";
+        if (!std::isfinite(next_x)) {
+            failure_reason =
+                    "new position is not finite";
 
-        return false;
-    }
+            return false;
+        }
 
-    const double next_coordinate =
-        evaluation_coordinate_(
-            next_x
-        );
+        const double next_coordinate =
+                evaluation_coordinate_(
+                    next_x
+                );
 
-    if (
-        !std::isfinite(
-            next_coordinate
-        )
-    ) {
-        failure_reason =
-            "wrapped new position "
-            "is not finite";
+        if (
+            !std::isfinite(
+                next_coordinate
+            )
+        ) {
+            failure_reason =
+                    "wrapped new position "
+                    "is not finite";
 
-        return false;
-    }
+            return false;
+        }
 
         /*
         * Состояние частицы обновляем только после
@@ -1263,7 +1260,7 @@ private:
         double period
     ) noexcept {
         return x -
-            period * std::floor(x / period);
+               period * std::floor(x / period);
     }
 
     [[nodiscard]] static double wrap_unit_fast_(

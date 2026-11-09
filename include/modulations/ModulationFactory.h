@@ -14,9 +14,9 @@ class ModulationFactory final {
 public:
     [[nodiscard]] static std::vector<DichotomicModulation>
     make_dichotomic_ensemble(
-        const DichotomicParams& params,
+        const DichotomicParams &params,
         std::size_t n_particles,
-        const SeedFactory& seeds
+        const SeedFactory &seeds
     ) {
         params.validate();
 
@@ -39,10 +39,10 @@ public:
     [[nodiscard]]
     static std::vector<TwoStateFactorModulation>
     make_two_state_factor_ensemble(
-        const ModulationSettings& settings,
+        const ModulationSettings &settings,
         double dt,
         std::size_t n_particles,
-        const SeedFactory& seeds
+        const SeedFactory &seeds
     ) {
         settings.validate();
 

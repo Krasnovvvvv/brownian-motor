@@ -15,11 +15,11 @@ public:
         unsigned int seed = std::random_device{}()
     )
         : params_{validated_(std::move(params))}
-    , transition_{DichotomicTransition::from(params_)}
-    , rng_{seed}
-    , uniform_{0.0, 1.0}
-    , state_is_a_{sample_stationary_state_()}
-    {}
+          , transition_{DichotomicTransition::from(params_)}
+          , rng_{seed}
+          , uniform_{0.0, 1.0}
+          , state_is_a_{sample_stationary_state_()} {
+    }
 
     /*
      * Делает один временной шаг дихотомического марковского процесса
@@ -43,8 +43,8 @@ public:
 
     [[nodiscard]] double current_sigma() const noexcept {
         return state_is_a_
-            ? params_.sigma_a
-            : params_.sigma_b;
+                   ? params_.sigma_a
+                   : params_.sigma_b;
     }
 
     [[nodiscard]] double current_factor() const noexcept {

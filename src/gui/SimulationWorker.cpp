@@ -35,12 +35,12 @@
 SimulationWorker::SimulationWorker(
     SimulationRequest request,
     std::shared_ptr<std::stop_source> cancellation_source,
-    QObject* parent
+    QObject *parent
 )
     : QObject{parent}
-    , request_{std::move(request)}
-    , cancellation_source_{std::move(cancellation_source)}
-{}
+      , request_{std::move(request)}
+      , cancellation_source_{std::move(cancellation_source)} {
+}
 
 void SimulationWorker::run() {
     try {
@@ -58,15 +58,15 @@ void SimulationWorker::run() {
          *   periodic or non-periodic according to its definition.
          */
         const bool periodic_profile =
-            request_.potential_definition
-                ? request_.potential_definition->profile.periodic
-                : true;
+                request_.potential_definition
+                    ? request_.potential_definition->profile.periodic
+                    : true;
 
         const double spatial_period =
-            request_.potential_definition &&
-            request_.potential_definition->profile.periodic
-                ? request_.potential_definition->profile.period
-                : 1.0;
+                request_.potential_definition &&
+                request_.potential_definition->profile.periodic
+                    ? request_.potential_definition->profile.period
+                    : 1.0;
 
         if (
             request_.use_lookup_table &&
@@ -99,7 +99,7 @@ void SimulationWorker::run() {
             .batch_steps = request_.batch_steps,
 
             .cancellation_check_steps =
-                request_.cancellation_check_steps
+            request_.cancellation_check_steps
         };
 
         simulation_params.validate();
@@ -110,82 +110,82 @@ void SimulationWorker::run() {
         };
 
         const auto stop_token =
-            cancellation_source_->get_token();
+                cancellation_source_->get_token();
 
         /*
          * One observer is shared by all modulation/profile paths.
          * It is passed to the solver only in interactive mode.
          */
         const SimulationObserver observer =
-            [this](
-                const SimulationUpdate& update
-            ) {
-                emit progress_updated(
-                    static_cast<qulonglong>(
-                        update.step + 1
-                    ),
-                    static_cast<qulonglong>(
-                        update.total_steps
-                    ),
-                    update.time,
-                    update.mean_x,
-                    update.mean_velocity
-                );
-            };
+                [this](
+            const SimulationUpdate &update
+        ) {
+            emit progress_updated(
+                static_cast<qulonglong>(
+                    update.step + 1
+                ),
+                static_cast<qulonglong>(
+                    update.total_steps
+                ),
+                update.time,
+                update.mean_x,
+                update.mean_velocity
+            );
+        };
 
         /*
          * Instantiate the solver for the selected profile type,
          * then dispatch to the selected modulation process.
          */
         const auto solve_with_profile =
-            [&]<typename Profile>(
-                Profile profile
-            ) -> EnsembleResult {
-                Potential<Profile> potential{
-                    std::move(profile)
-                };
+                [&]<typename Profile>(
+            Profile profile
+        ) -> EnsembleResult {
+            Potential<Profile> potential{
+                std::move(profile)
+            };
 
-                LangevinSolverCpu<Profile> solver{
-                    std::move(potential),
-                    simulation_params,
-                    seeds,
-                    request_.requested_workers
-                };
+            LangevinSolverCpu<Profile> solver{
+                std::move(potential),
+                simulation_params,
+                seeds,
+                request_.requested_workers
+            };
 
             const auto solve_deterministic =
-                [&](auto& modulation) -> EnsembleResult {
-                    if (request_.interactive_mode) {
-                        return solver
+                    [&](auto &modulation) -> EnsembleResult {
+                if (request_.interactive_mode) {
+                    return solver
                             .solve_deterministic_interactive(
                                 modulation,
                                 observer,
                                 stop_token
                             );
-                    }
+                }
 
-                    return solver
+                return solver
                         .solve_deterministic_fast(
                             modulation,
                             stop_token
                         );
-                };
+            };
 
-                switch (request_.modulation.kind) {
+            switch (request_.modulation.kind) {
                 case ModulationKind::LegacySymmetric: {
                     /*
                      * Preserve the existing parameter mapping:
                      * amplitude, epsilon (= correlation time), alpha.
                      */
                     const DichotomicParams modulation_params =
-                        DichotomicParams::symmetric(
-                            request_.modulation_amplitude,
-                            request_.epsilon,
-                            request_.dt,
-                            request_.alpha
-                        );
+                            DichotomicParams::symmetric(
+                                request_.modulation_amplitude,
+                                request_.epsilon,
+                                request_.dt,
+                                request_.alpha
+                            );
 
                     auto modulations =
-                        ModulationFactory::
+                            ModulationFactory::
                             make_dichotomic_ensemble(
                                 modulation_params,
                                 request_.n_particles,
@@ -194,11 +194,11 @@ void SimulationWorker::run() {
 
                     if (request_.interactive_mode) {
                         return solver
-                            .solve_stochastic_interactive(
-                                modulations,
-                                observer,
-                                stop_token
-                            );
+                                .solve_stochastic_interactive(
+                                    modulations,
+                                    observer,
+                                    stop_token
+                                );
                     }
 
                     return solver.solve_stochastic_fast(
@@ -215,7 +215,7 @@ void SimulationWorker::run() {
                      * Each particle receives its own process.
                      */
                     auto modulations =
-                        ModulationFactory::
+                            ModulationFactory::
                             make_two_state_factor_ensemble(
                                 request_.modulation,
                                 request_.dt,
@@ -225,11 +225,11 @@ void SimulationWorker::run() {
 
                     if (request_.interactive_mode) {
                         return solver
-                            .solve_stochastic_interactive(
-                                modulations,
-                                observer,
-                                stop_token
-                            );
+                                .solve_stochastic_interactive(
+                                    modulations,
+                                    observer,
+                                    stop_token
+                                );
                     }
 
                     return solver.solve_stochastic_fast(
@@ -252,11 +252,11 @@ void SimulationWorker::run() {
 
                     if (request_.interactive_mode) {
                         return solver
-                            .solve_deterministic_interactive(
-                                modulation,
-                                observer,
-                                stop_token
-                            );
+                                .solve_deterministic_interactive(
+                                    modulation,
+                                    observer,
+                                    stop_token
+                                );
                     }
 
                     return solver.solve_deterministic_fast(
@@ -266,67 +266,67 @@ void SimulationWorker::run() {
                 }
 
                 case ModulationKind::Constant: {
-                        ConstantModulation modulation{
-                            request_.modulation.constant_factor
-                        };
+                    ConstantModulation modulation{
+                        request_.modulation.constant_factor
+                    };
 
-                        return solve_deterministic(
-                            modulation
-                        );
-                    }
+                    return solve_deterministic(
+                        modulation
+                    );
+                }
 
                 case ModulationKind::Sinusoidal: {
-                        const double omega =
+                    const double omega =
                             2.0 *
                             std::numbers::pi_v<double> /
                             request_.modulation.sinusoidal_period;
 
-                        SinusoidalModulation modulation{
-                            request_.modulation.sinusoidal_amplitude,
-                            omega,
-                            request_.dt,
+                    SinusoidalModulation modulation{
+                        request_.modulation.sinusoidal_amplitude,
+                        omega,
+                        request_.dt,
 
-                            // Initial model time.
-                            0.0,
+                        // Initial model time.
+                        0.0,
 
-                            request_.modulation.sinusoidal_offset,
-                            request_.modulation.sinusoidal_phase
-                        };
+                        request_.modulation.sinusoidal_offset,
+                        request_.modulation.sinusoidal_phase
+                    };
 
-                        return solve_deterministic(
-                            modulation
-                        );
-                    }
-
-                    case ModulationKind::RectangularPeriodic: {
-                        RectangularModulation modulation{
-                            request_.modulation,
-                            request_.dt
-                        };
-
-                        return solve_deterministic(
-                            modulation
-                        );
-                    }
+                    return solve_deterministic(
+                        modulation
+                    );
                 }
 
-                throw std::invalid_argument(
-                    "Unknown modulation kind"
-                );
-            };
+                case ModulationKind::RectangularPeriodic: {
+                    RectangularModulation modulation{
+                        request_.modulation,
+                        request_.dt
+                    };
+
+                    return solve_deterministic(
+                        modulation
+                    );
+                }
+            }
+
+            throw std::invalid_argument(
+                "Unknown modulation kind"
+            );
+        };
 
         /*
          * Total measured time includes profile preparation,
          * modulation preparation and the solver execution.
          */
         const auto started_at =
-            std::chrono::steady_clock::now();
+                std::chrono::steady_clock::now();
 
         EnsembleResult result;
 
         if (request_.potential_definition) {
             const auto preparation_started_at =
-                std::chrono::steady_clock::now();
+                    std::chrono::steady_clock::now();
 
             ExpressionEvaluator exact_profile{
                 *request_.potential_definition,
@@ -343,10 +343,10 @@ void SimulationWorker::run() {
                 };
 
                 const double preparation_seconds =
-                    std::chrono::duration<double>(
-                        std::chrono::steady_clock::now() -
-                        preparation_started_at
-                    ).count();
+                        std::chrono::duration<double>(
+                            std::chrono::steady_clock::now() -
+                            preparation_started_at
+                        ).count();
 
                 emit profile_prepared(
                     QStringLiteral(
@@ -363,10 +363,10 @@ void SimulationWorker::run() {
                 );
             } else {
                 const double preparation_seconds =
-                    std::chrono::duration<double>(
-                        std::chrono::steady_clock::now() -
-                        preparation_started_at
-                    ).count();
+                        std::chrono::duration<double>(
+                            std::chrono::steady_clock::now() -
+                            preparation_started_at
+                        ).count();
 
                 emit profile_prepared(
                     QStringLiteral("exprtk"),
@@ -394,45 +394,45 @@ void SimulationWorker::run() {
         }
 
         const auto finished_at =
-            std::chrono::steady_clock::now();
+                std::chrono::steady_clock::now();
 
         const double elapsed_seconds =
-            std::chrono::duration<double>(
-                finished_at - started_at
-            ).count();
+                std::chrono::duration<double>(
+                    finished_at - started_at
+                ).count();
 
         const std::size_t total_updates =
-            request_.n_particles *
-            simulation_params.step_count();
+                request_.n_particles *
+                simulation_params.step_count();
 
         const double throughput =
-            elapsed_seconds > 0.0
-                ? static_cast<double>(total_updates) /
-                  elapsed_seconds /
-                  1.0e6
-                : 0.0;
+                elapsed_seconds > 0.0
+                    ? static_cast<double>(total_updates) /
+                      elapsed_seconds /
+                      1.0e6
+                    : 0.0;
 
         const std::size_t detected_hardware_threads =
-            std::max(
-                std::size_t{1},
-                static_cast<std::size_t>(
-                    std::thread::hardware_concurrency()
-                )
-            );
-
-        const std::size_t requested_workers =
-            request_.requested_workers == 0
-                ? detected_hardware_threads
-                : request_.requested_workers;
-
-        const std::size_t workers =
-            std::min(
                 std::max(
                     std::size_t{1},
-                    requested_workers
-                ),
-                request_.n_particles
-            );
+                    static_cast<std::size_t>(
+                        std::thread::hardware_concurrency()
+                    )
+                );
+
+        const std::size_t requested_workers =
+                request_.requested_workers == 0
+                    ? detected_hardware_threads
+                    : request_.requested_workers;
+
+        const std::size_t workers =
+                std::min(
+                    std::max(
+                        std::size_t{1},
+                        requested_workers
+                    ),
+                    request_.n_particles
+                );
 
         QJsonObject statistics{
             {
@@ -524,8 +524,8 @@ void SimulationWorker::run() {
             );
 
             const bool contains_zero =
-                result.velocity_ci95_lower <= 0.0 &&
-                result.velocity_ci95_upper >= 0.0;
+                    result.velocity_ci95_lower <= 0.0 &&
+                    result.velocity_ci95_upper >= 0.0;
 
             statistics.insert(
                 "ci95_contains_zero",
@@ -534,7 +534,7 @@ void SimulationWorker::run() {
         }
 
         statistics.insert(
-        "control_variate_available",
+            "control_variate_available",
             result.has_control_variate_statistics
         );
 
@@ -570,8 +570,8 @@ void SimulationWorker::run() {
             );
 
             const bool contains_zero =
-                result.control_variate_ci95_lower <= 0.0 &&
-                result.control_variate_ci95_upper >= 0.0;
+                    result.control_variate_ci95_lower <= 0.0 &&
+                    result.control_variate_ci95_upper >= 0.0;
 
             statistics.insert(
                 "control_variate_ci95_contains_zero",
@@ -597,7 +597,7 @@ void SimulationWorker::run() {
             throughput,
             workers
         );
-    } catch (const std::exception& exception) {
+    } catch (const std::exception &exception) {
         emit failed(
             QString::fromUtf8(
                 exception.what()

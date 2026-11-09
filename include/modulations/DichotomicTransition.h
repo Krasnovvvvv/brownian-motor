@@ -13,7 +13,7 @@ struct DichotomicTransition final {
     double p_a_stationary{};
 
     [[nodiscard]] static DichotomicTransition from(
-        const DichotomicParams& params
+        const DichotomicParams &params
     ) {
         params.validate();
 
@@ -40,7 +40,7 @@ struct DichotomicTransition final {
             throw std::invalid_argument(
                 "dichotomic transition probabilities must be finite"
             );
-            }
+        }
 
         if (p_aa < 0.0 || p_aa > 1.0 ||
             p_bb < 0.0 || p_bb > 1.0 ||
@@ -48,7 +48,7 @@ struct DichotomicTransition final {
             throw std::invalid_argument(
                 "dichotomic transition probabilities must lie in [0, 1]"
             );
-            }
+        }
     }
 };
 

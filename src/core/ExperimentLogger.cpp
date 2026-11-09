@@ -8,8 +8,7 @@
 #include <QTextStream>
 
 ExperimentLogger::ExperimentLogger()
-    : log_file_path_{create_log_file_path_()}
-{
+    : log_file_path_{create_log_file_path_()} {
 }
 
 QString ExperimentLogger::log_file_path() const {
@@ -17,8 +16,8 @@ QString ExperimentLogger::log_file_path() const {
 }
 
 bool ExperimentLogger::write_event(
-    const QString& event_name,
-    const QJsonObject& data
+    const QString &event_name,
+    const QJsonObject &data
 ) {
     QJsonObject event = data;
 
@@ -37,13 +36,13 @@ bool ExperimentLogger::write_event(
     QFile file{log_file_path_};
 
     if (!file.open(
-            QIODevice::WriteOnly |
-            QIODevice::Append |
-            QIODevice::Text
-        )) {
+        QIODevice::WriteOnly |
+        QIODevice::Append |
+        QIODevice::Text
+    )) {
         last_error_ = file.errorString();
         return false;
-        }
+    }
 
     QTextStream stream{&file};
 
@@ -64,9 +63,9 @@ QString ExperimentLogger::last_error() const {
 
 QString ExperimentLogger::create_log_file_path_() const {
     const QString data_directory =
-        QStandardPaths::writableLocation(
-            QStandardPaths::AppDataLocation
-        );
+            QStandardPaths::writableLocation(
+                QStandardPaths::AppDataLocation
+            );
 
     QDir directory{data_directory};
 
