@@ -65,6 +65,9 @@ add_executable(brownian-motor
 
         include/modulations/RectangularModulation.h
 
+        include/gui/PotentialPreviewDialog.h
+        src/gui/PotentialPreviewDialog.cpp
+
         resources/icons.qrc
         ${app_icon_resource_windows}
 )

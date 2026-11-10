@@ -51,6 +51,7 @@
 
 #include "core/PotentialConfigParser.h"
 #include "gui/PotentialDropArea.h"
+#include "gui/PotentialPreviewDialog.h"
 
 #include "core/ExpressionEvaluator.h"
 #include "core/PotentialDerivativeCheck.h"
@@ -1010,12 +1011,27 @@ void MainWindow::create_interface_() {
         potential_group
     };
 
+    show_potential_button_ = new QPushButton{
+        "Show",
+        potential_group
+    };
+
+    show_potential_button_->setEnabled(false);
+    show_potential_button_->setToolTip(
+        "Show one period of the loaded potential "
+        "using the current parameter values."
+    );
+
     potential_buttons_layout->addWidget(
         open_potential_button_
     );
 
     potential_buttons_layout->addWidget(
         builtin_potential_button_
+    );
+
+    potential_buttons_layout->addWidget(
+        show_potential_button_
     );
 
     potential_drop_area_ =
@@ -1664,6 +1680,15 @@ void MainWindow::connect_controls_() {
         this,
         [this] {
             use_builtin_potential_();
+        }
+    );
+
+    connect(
+        show_potential_button_,
+        &QPushButton::clicked,
+        this,
+        [this] {
+            show_potential_window_();
         }
     );
 
@@ -2813,6 +2838,56 @@ void MainWindow::cancel_simulation_() {
     );
 }
 
+void MainWindow::show_potential_window_() {
+    if (
+        simulation_thread_ ||
+        potential_state_ != PotentialState::Ready ||
+        !active_potential_definition_
+    ) {
+        return;
+    }
+
+    const PotentialDefinition &definition =
+            *active_potential_definition_;
+
+    if (!definition.profile.periodic) {
+        QMessageBox::information(
+            this,
+            "Potential preview",
+            "This potential is non-periodic. "
+            "A one-period preview is not available."
+        );
+
+        return;
+    }
+
+    try {
+        PotentialPreviewDialog dialog{
+            definition,
+            potential_values_from_controls_(),
+            this
+        };
+
+        dialog.exec();
+    } catch (const std::exception &exception) {
+        const QString message = QString::fromUtf8(
+            exception.what()
+        );
+
+        append_log_(
+            QString{
+                "Potential preview failed: %1"
+            }.arg(message)
+        );
+
+        QMessageBox::warning(
+            this,
+            "Potential preview",
+            message
+        );
+    }
+}
+
 void MainWindow::show_trajectory_window_() {
     if (!trajectory_dialog_) {
         return;
@@ -3443,6 +3518,12 @@ void MainWindow::update_potential_controls_(
     builtin_potential_button_->setEnabled(
         !is_running &&
         !validating
+    );
+
+    show_potential_button_->setEnabled(
+        !is_running &&
+        potential_state_ == PotentialState::Ready &&
+        active_potential_definition_.has_value()
     );
 
     potential_drop_area_->setEnabled(

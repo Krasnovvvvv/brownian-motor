@@ -73,6 +73,8 @@ private:
 
     void show_trajectory_window_();
 
+    void show_potential_window_();
+
     void update_show_graph_button_();
 
     void begin_trend_selection_();
@@ -126,6 +128,7 @@ private:
 
     QPushButton *open_potential_button_{nullptr};
     QPushButton *builtin_potential_button_{nullptr};
+    QPushButton *show_potential_button_{nullptr};
 
     PotentialDropArea *potential_drop_area_{nullptr};
 
