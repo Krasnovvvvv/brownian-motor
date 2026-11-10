@@ -1,0 +1,44 @@
+{
+  "format": "brownian-motor-potential",
+  "format_version": 2,
+  "id": "piecewise_linear_ratchet",
+  "name": "Piecewise-linear ratchet",
+  "description": "Continuous periodic sawtooth profile. H is the height, a is the peak position in a unit period.",
+  "coordinate": {
+    "symbol": "x",
+    "unit": "dimensionless"
+  },
+  "profile": {
+    "expression": "if(x < a, H*x/a, H*(1-x)/(1-a))",
+    "derivative_expression": "if(x < a, H/a, -H/(1-a))",
+    "periodic": true,
+    "period": 1.0,
+    "breakpoints": [
+      "a"
+    ]
+  },
+  "parameters": [
+    {
+      "id": "H",
+      "label": "Barrier height",
+      "description": "Potential height above its minimum.",
+      "unit": "dimensionless",
+      "default": 1.0,
+      "minimum": 0.0,
+      "maximum": 10.0,
+      "step": 0.1,
+      "decimals": 6
+    },
+    {
+      "id": "a",
+      "label": "Peak position",
+      "description": "Position of the maximum within a unit period.",
+      "unit": "dimensionless",
+      "default": 0.3,
+      "minimum": 0.01,
+      "maximum": 0.99,
+      "step": 0.01,
+      "decimals": 6
+    }
+  ]
+}

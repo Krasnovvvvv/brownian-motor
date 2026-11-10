@@ -3,8 +3,8 @@
 #pragma once
 
 #include <memory>
-
-#include "core/PotentialDefinition.h"
+#include <vector>
+#include "core/PotentialDefinition.h"   
 
 class ExpressionEvaluator final {
 public:
@@ -12,56 +12,24 @@ public:
         const PotentialDefinition &definition,
         const PotentialParameterValues &parameter_values = {}
     );
-
     ~ExpressionEvaluator();
+    ExpressionEvaluator(const ExpressionEvaluator &other);
+    ExpressionEvaluator &operator=(const ExpressionEvaluator &other);
+    ExpressionEvaluator(ExpressionEvaluator &&) noexcept;
+    ExpressionEvaluator &operator=(ExpressionEvaluator &&) noexcept;
 
-    ExpressionEvaluator(
-        const ExpressionEvaluator &other
-    );
+    [[nodiscard]] double operator()(double coordinate) const noexcept;
+    [[nodiscard]] double value(double coordinate) const noexcept;
+    [[nodiscard]] double derivative(double coordinate) const noexcept;
+    [[nodiscard]] const PotentialDefinition &definition() const noexcept;
 
-    ExpressionEvaluator &operator=(
-        const ExpressionEvaluator &other
-    );
-
-    ExpressionEvaluator(
-        ExpressionEvaluator &&
-    ) noexcept;
-
-    ExpressionEvaluator &operator=(
-        ExpressionEvaluator &&
-    ) noexcept;
-
-    /*
-    * Позволяет использовать ExpressionEvaluator
-    * как SpatialProfile в Potential<Profile>.
-    *
-    *  Profile(coordinate) == U(coordinate).
-    */
-    [[nodiscard]] double operator()(
-        double coordinate
-    ) const noexcept;
-
-    /*
-     * Возвращает U(coordinate).
-     */
-    [[nodiscard]] double value(
-        double coordinate
-    ) const noexcept;
-
-    /*
-     * Возвращает dU/d(coordinate).
-     */
-    [[nodiscard]] double derivative(
-        double coordinate
-    ) const noexcept;
-
-    [[nodiscard]] const PotentialDefinition &
-    definition() const noexcept;
+    // Resolved using the actual parameter values supplied to this evaluator.
+    [[nodiscard]] bool piecewise() const noexcept;
+    [[nodiscard]] const std::vector<double> &breakpoints() const noexcept;
 
 private:
     class Impl;
-
     std::unique_ptr<Impl> impl_;
 };
 
-#endif // BROWNIAN_MOTOR_EXPRESSIONEVALUATOR_H
+#endif

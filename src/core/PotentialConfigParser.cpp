@@ -19,9 +19,12 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace {
     constexpr int supported_format_version = 1;
+
+    constexpr int piecewise_format_version = 2;
 
     constexpr const char *expected_format =
             "brownian-motor-potential";
@@ -377,6 +380,135 @@ namespace {
         return true;
     }
 
+    [[nodiscard]] bool parse_profile_breakpoints(
+        const QJsonObject &profile_object,
+        PotentialDefinition &definition,
+        QString &error_message
+    ) {
+        /*
+         * Отсутствие нового поля сохраняет
+         * существующий режим работы.
+         */
+        if (!profile_object.contains("breakpoints")) {
+            return true;
+        }
+
+        if (
+            definition.format_version !=
+            piecewise_format_version
+        ) {
+            error_message =
+                    "profile.breakpoints requires "
+                    "format_version = 2.";
+
+            return false;
+        }
+
+        /*
+         * Текущая реализация кусочного lookup
+         * поддерживает периодические профили.
+         */
+        if (!definition.profile.periodic) {
+            error_message =
+                    "profile.breakpoints currently requires "
+                    "profile.periodic = true.";
+
+            return false;
+        }
+
+        const QJsonValue breakpoints_value =
+                profile_object.value("breakpoints");
+
+        if (!breakpoints_value.isArray()) {
+            error_message =
+                    "profile.breakpoints must be an array "
+                    "of parameter-only expression strings.";
+
+            return false;
+        }
+
+        const QJsonArray breakpoints_array =
+                breakpoints_value.toArray();
+
+        constexpr qsizetype maximum_breakpoints =
+                4095;
+
+        if (
+            breakpoints_array.size() >
+            maximum_breakpoints
+        ) {
+            error_message = QString{
+                        "profile.breakpoints must contain "
+                        "no more than %1 entries."
+                    }
+                    .arg(maximum_breakpoints);
+
+            return false;
+        }
+
+        std::vector<std::string>
+                breakpoint_expressions;
+
+        breakpoint_expressions.reserve(
+            static_cast<std::size_t>(
+                breakpoints_array.size()
+            )
+        );
+
+        for (
+            qsizetype index = 0;
+            index < breakpoints_array.size();
+            ++index
+        ) {
+            const QJsonValue breakpoint_value =
+                    breakpoints_array.at(index);
+
+            if (!breakpoint_value.isString()) {
+                error_message = QString{
+                            "profile.breakpoints[%1] "
+                            "must be a string."
+                        }
+                        .arg(index);
+
+                return false;
+            }
+
+            const QString expression =
+                    breakpoint_value.toString();
+
+            if (expression.trimmed().isEmpty()) {
+                error_message = QString{
+                            "profile.breakpoints[%1] "
+                            "must not be empty."
+                        }
+                        .arg(index);
+
+                return false;
+            }
+
+            breakpoint_expressions.push_back(
+                expression.toStdString()
+            );
+        }
+
+        /*
+         * Наличие массива включает кусочный режим.
+         *
+         * Пустой массив допустим: внутренних границ
+         * нет, но производная может иметь скачок
+         * на периодическом стыке.
+         *
+         * Вычисление границ и проверка их порядка
+         * выполняются в ExpressionEvaluator.
+         */
+        definition.profile.breakpoint_expressions =
+                std::move(breakpoint_expressions);
+
+        definition.profile.piecewise = true;
+
+        return true;
+    }
+
     [[nodiscard]] bool validate_expression_values(
         const PotentialDefinition &definition,
         QString &error_message
@@ -644,15 +776,18 @@ PotentialConfigParser::parse_json(
 
     if (
         format_version !=
-        supported_format_version
+        supported_format_version &&
+        format_version !=
+        piecewise_format_version
     ) {
         return fail(
             QString{
                 "Unsupported potential format version %1. "
-                "Supported version: %2."
+                "Supported versions: %2, %3."
             }
             .arg(format_version)
             .arg(supported_format_version)
+            .arg(piecewise_format_version)
         );
     }
 
@@ -892,6 +1027,16 @@ PotentialConfigParser::parse_json(
         definition.parameters.push_back(
             std::move(parameter)
         );
+    }
+
+    if (
+        !parse_profile_breakpoints(
+            profile_object,
+            definition,
+            error_message
+        )
+    ) {
+        return fail(error_message);
     }
 
     if (

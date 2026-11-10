@@ -1,0 +1,56 @@
+{
+  "format": "brownian-motor-potential",
+  "format_version": 2,
+  "id": "quadratic_plateau",
+  "name": "Quadratic rise, plateau, quadratic fall",
+  "description": "Continuous periodic potential with three smooth branches and derivative jumps at a and b.",
+  "coordinate": {
+    "symbol": "x",
+    "unit": "dimensionless"
+  },
+  "profile": {
+    "expression": "if(x < a, H*(x/a)^2, if(x < b, H, H*((1-x)/(1-b))^2))",
+    "derivative_expression": "if(x < a, 2*H*x/(a^2), if(x < b, 0, -2*H*(1-x)/((1-b)^2)))",
+    "periodic": true,
+    "period": 1.0,
+    "breakpoints": [
+      "a",
+      "b"
+    ]
+  },
+  "parameters": [
+    {
+      "id": "H",
+      "label": "Barrier height",
+      "description": "Height of the plateau above the minimum.",
+      "unit": "dimensionless",
+      "default": 1.0,
+      "minimum": 0.0,
+      "maximum": 10.0,
+      "step": 0.1,
+      "decimals": 6
+    },
+    {
+      "id": "a",
+      "label": "Plateau start",
+      "description": "End of the rising branch.",
+      "unit": "dimensionless",
+      "default": 0.25,
+      "minimum": 0.05,
+      "maximum": 0.45,
+      "step": 0.01,
+      "decimals": 6
+    },
+    {
+      "id": "b",
+      "label": "Plateau end",
+      "description": "Start of the falling branch.",
+      "unit": "dimensionless",
+      "default": 0.65,
+      "minimum": 0.55,
+      "maximum": 0.95,
+      "step": 0.01,
+      "decimals": 6
+    }
+  ]
+}

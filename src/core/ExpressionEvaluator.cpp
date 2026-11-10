@@ -1,9 +1,12 @@
 #include "core/ExpressionEvaluator.h"
 
+#include "core/PotentialDerivativeCheck.h"
+
 #include <exprtk.hpp>
 
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -51,6 +54,13 @@ namespace {
     [[nodiscard]] bool is_reserved_identifier(
         const std::string &identifier
     ) {
+        /*
+         * Сохраняем существующий список.
+         *
+         * Дополнительные ограничения на имена,
+         * которые устанавливает сам ExprTk,
+         * остаются ответственностью ExprTk.
+         */
         static const std::unordered_set<std::string>
                 reserved_identifiers{
                     "abs",
@@ -195,7 +205,10 @@ namespace {
             definition.coordinate.symbol
         );
 
-        for (const auto &parameter: definition.parameters) {
+        for (
+            const auto &parameter:
+            definition.parameters
+        ) {
             validate_parameter_definition(parameter);
 
             if (
@@ -216,6 +229,48 @@ namespace {
                     "' is declared more than once."
                 };
             }
+        }
+
+        /*
+         * Дополнительные проверки относятся только
+         * к новым метаданным кусочного профиля.
+         */
+        if (definition.profile.piecewise) {
+            if (definition.format_version != 2) {
+                throw std::invalid_argument{
+                    "Piecewise potential requires "
+                    "format_version = 2."
+                };
+            }
+
+            if (!definition.profile.periodic) {
+                throw std::invalid_argument{
+                    "Piecewise potential currently requires "
+                    "periodic = true."
+                };
+            }
+        } else if (
+            !definition.profile
+                    .breakpoint_expressions.empty()
+        ) {
+            throw std::invalid_argument{
+                "Breakpoint expressions require "
+                "piecewise mode."
+            };
+        }
+
+        constexpr std::size_t maximum_breakpoints =
+                4095;
+
+        if (
+            definition.profile
+                    .breakpoint_expressions.size() >
+            maximum_breakpoints
+        ) {
+            throw std::invalid_argument{
+                "At most 4095 internal breakpoints "
+                "are supported."
+            };
         }
     }
 
@@ -261,7 +316,10 @@ namespace {
         std::unordered_set<std::string>
                 declared_identifiers;
 
-        for (const auto &parameter: definition.parameters) {
+        for (
+            const auto &parameter:
+            definition.parameters
+        ) {
             declared_identifiers.insert(
                 parameter.id
             );
@@ -286,6 +344,42 @@ namespace {
             }
         }
     }
+
+    [[nodiscard]] double wrap_coordinate(
+        double coordinate,
+        double period
+    ) noexcept {
+        if (!std::isfinite(coordinate)) {
+            return
+                    std::numeric_limits<double>::quiet_NaN();
+        }
+
+        if (
+            coordinate >= 0.0 &&
+            coordinate < period
+        ) {
+            return coordinate;
+        }
+
+        double phase = std::fmod(
+            coordinate,
+            period
+        );
+
+        if (phase < 0.0) {
+            phase += period;
+        }
+
+        /*
+         * Защита от округления при прибавлении period
+         * к отрицательному остатку.
+         */
+        if (phase >= period) {
+            phase = 0.0;
+        }
+
+        return phase;
+    }
 } // namespace
 
 class ExpressionEvaluator::Impl final {
@@ -306,6 +400,7 @@ public:
         : definition{source_definition}
           , parameter_values{values} {
         validate_definition(definition);
+
         validate_parameter_values(
             definition,
             values
@@ -315,7 +410,10 @@ public:
             definition.parameters.size()
         );
 
-        for (const auto &parameter: definition.parameters) {
+        for (
+            const auto &parameter:
+            definition.parameters
+        ) {
             parameter_storage.push_back(
                 parameter_value(
                     parameter,
@@ -324,6 +422,13 @@ public:
             );
         }
 
+        /*
+         * Основные выражения регистрируются так же,
+         * как в исходной реализации.
+         *
+         * Параметры остаются переменными ExprTk:
+         * замены add_variable на add_constant здесь нет.
+         */
         symbol_table.add_variable(
             definition.coordinate.symbol,
             coordinate
@@ -371,6 +476,14 @@ public:
                 "Cannot compile potential derivative expression."
             };
         }
+
+        /*
+         * Дополнительная подготовка выполняется
+         * только для кусочного режима.
+         */
+        if (definition.profile.piecewise) {
+            resolve_breakpoints();
+        }
     }
 
     Impl(const Impl &other)
@@ -383,7 +496,9 @@ public:
     [[nodiscard]] double value(
         double coordinate_value
     ) noexcept {
-        coordinate = coordinate_value;
+        coordinate = evaluation_coordinate(
+            coordinate_value
+        );
 
         return profile_expression.value();
     }
@@ -391,22 +506,148 @@ public:
     [[nodiscard]] double derivative(
         double coordinate_value
     ) noexcept {
-        coordinate = coordinate_value;
+        coordinate = evaluation_coordinate(
+            coordinate_value
+        );
 
         return derivative_expression.value();
     }
 
-    PotentialParameterValues parameter_values;
     PotentialDefinition definition;
+    PotentialParameterValues parameter_values;
 
     double coordinate{0.0};
 
     std::vector<double> parameter_storage;
+    std::vector<double> resolved_breakpoints;
 
     SymbolTable symbol_table;
     Expression profile_expression;
     Expression derivative_expression;
     Parser parser;
+
+private:
+    [[nodiscard]] double evaluation_coordinate(
+        double coordinate_value
+    ) const noexcept {
+        /*
+         * Для существующих, некусочных определений
+         * сохраняется прежняя передача координаты
+         * без периодического приведения.
+         */
+        if (!definition.profile.piecewise) {
+            return coordinate_value;
+        }
+
+        return wrap_coordinate(
+            coordinate_value,
+            definition.profile.period
+        );
+    }
+
+    void resolve_breakpoints() {
+        /*
+         * Отдельная таблица символов:
+         *
+         * - содержит выбранные значения параметров;
+         * - содержит стандартные константы;
+         * - НЕ содержит пространственную координату.
+         *
+         * Константность параметров здесь относится
+         * только к выражениям границ, а не к основным
+         * выражениям потенциала и производной.
+         */
+        SymbolTable breakpoint_symbol_table;
+
+        for (
+            std::size_t index = 0;
+            index < definition.parameters.size();
+            ++index
+        ) {
+            const std::string &id =
+                    definition.parameters[index].id;
+
+            if (
+                !breakpoint_symbol_table.add_constant(
+                    id,
+                    parameter_storage[index]
+                )
+            ) {
+                throw std::invalid_argument{
+                    "Cannot register parameter '" +
+                    id +
+                    "' for breakpoint expressions."
+                };
+            }
+        }
+
+        breakpoint_symbol_table.add_constants();
+
+        resolved_breakpoints.reserve(
+            definition.profile
+                    .breakpoint_expressions.size()
+        );
+
+        double previous_breakpoint = 0.0;
+
+        for (
+            const std::string &expression_text:
+            definition.profile.breakpoint_expressions
+        ) {
+            Expression breakpoint_expression;
+
+            breakpoint_expression.register_symbol_table(
+                breakpoint_symbol_table
+            );
+
+            Parser breakpoint_parser;
+
+            if (
+                !breakpoint_parser.compile(
+                    expression_text,
+                    breakpoint_expression
+                )
+            ) {
+                throw std::invalid_argument{
+                    "Cannot compile parameter-only "
+                    "breakpoint expression '" +
+                    expression_text +
+                    "': " +
+                    breakpoint_parser.error()
+                };
+            }
+
+            const double breakpoint =
+                    breakpoint_expression.value();
+
+            if (!std::isfinite(breakpoint)) {
+                throw std::invalid_argument{
+                    "Breakpoint expression '" +
+                    expression_text +
+                    "' produced a non-finite value."
+                };
+            }
+
+            if (
+                breakpoint <= previous_breakpoint ||
+                breakpoint >= definition.profile.period
+            ) {
+                throw std::invalid_argument{
+                    "Breakpoints must satisfy "
+                    "0 < b1 < b2 < ... < period. "
+                    "Invalid breakpoint expression: '" +
+                    expression_text +
+                    "'."
+                };
+            }
+
+            resolved_breakpoints.push_back(
+                breakpoint
+            );
+
+            previous_breakpoint = breakpoint;
+        }
+    }
 };
 
 ExpressionEvaluator::ExpressionEvaluator(
@@ -419,6 +660,29 @@ ExpressionEvaluator::ExpressionEvaluator(
             parameter_values
         )
     } {
+    /*
+     * Для кусочного профиля проверка выполняется
+     * с фактическими параметрами этого экземпляра,
+     * в том числе выбранными пользователем в UI.
+     *
+     * Для существующего некусочного режима
+     * поведение конструктора не меняется:
+     * прежняя проверка при загрузке остаётся
+     * в PotentialConfigParser.
+     */
+    if (piecewise()) {
+        if (
+            const auto derivative_error =
+                    check_potential_derivative(
+                        impl_->definition,
+                        *this
+                    )
+        ) {
+            throw std::invalid_argument{
+                *derivative_error
+            };
+        }
+    }
 }
 
 ExpressionEvaluator::~ExpressionEvaluator() = default;
@@ -478,4 +742,13 @@ double ExpressionEvaluator::derivative(
 const PotentialDefinition &
 ExpressionEvaluator::definition() const noexcept {
     return impl_->definition;
+}
+
+bool ExpressionEvaluator::piecewise() const noexcept {
+    return impl_->definition.profile.piecewise;
+}
+
+const std::vector<double> &
+ExpressionEvaluator::breakpoints() const noexcept {
+    return impl_->resolved_breakpoints;
 }

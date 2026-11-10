@@ -107,6 +107,9 @@ if (BUILD_TESTING)
 
             include/core/ExpressionEvaluator.h
             src/core/ExpressionEvaluator.cpp
+
+            include/core/PotentialDerivativeCheck.h
+            src/core/PotentialDerivativeCheck.cpp
     )
 
     target_include_directories(
@@ -275,4 +278,44 @@ if (BUILD_TESTING)
                 $<$<CONFIG:Release>:-march=native>
         )
     endif()
+
+    add_executable(
+            piecewise-integration-smoke-test
+
+            tests/piecewise_integration_smoke.cpp
+
+            include/core/PotentialDefinition.h
+
+            include/core/ExpressionEvaluator.h
+            src/core/ExpressionEvaluator.cpp
+
+            include/core/PotentialConfigParser.h
+            src/core/PotentialConfigParser.cpp
+
+            include/core/PotentialDerivativeCheck.h
+            src/core/PotentialDerivativeCheck.cpp
+
+            include/profiles/TabulatedPeriodicProfile.h
+    )
+
+    target_include_directories(
+            piecewise-integration-smoke-test
+            PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${EXPRTK_INCLUDE_DIR}
+    )
+
+    target_link_libraries(
+            piecewise-integration-smoke-test
+            PRIVATE
+            Qt6::Core
+    )
+
+    add_test(
+            NAME piecewise-integration-smoke-test
+            COMMAND
+            piecewise-integration-smoke-test
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/potentials/piecewise_linear_ratchet.bmpotential"
+    )
+
 endif()
