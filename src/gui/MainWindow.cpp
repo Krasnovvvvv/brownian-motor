@@ -1481,7 +1481,7 @@ void MainWindow::create_interface_() {
     results_layout->addWidget(
         new QLabel(
             QStringLiteral(
-                "Velocity (CV \u00B1 SE)"
+                "Speed (CV \u00B1 SE)"
             )
         ),
         0,
