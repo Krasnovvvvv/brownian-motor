@@ -37,6 +37,7 @@
 #include <QJsonDocument>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <cstddef>
@@ -1052,6 +1053,20 @@ void MainWindow::create_interface_() {
         36
     );
 
+    lookup_table_check_ = new QCheckBox{
+        "Approximate force",
+        potential_group
+    };
+
+    lookup_table_check_->setChecked(false);
+
+    lookup_table_check_->setToolTip(
+        "Use a precomputed spatial derivative table. "
+        "Available for loaded periodic potentials only. "
+        "Piecewise profiles use separate tables for each segment. "
+        "Nonlinear derivatives may have interpolation error."
+    );
+
     potential_parameters_scroll_ =
             new QScrollArea{
                 potential_group
@@ -1124,6 +1139,10 @@ void MainWindow::create_interface_() {
 
     potential_layout->addWidget(
         potential_info_label_
+    );
+
+    potential_layout->addWidget(
+        lookup_table_check_
     );
 
     potential_layout->addWidget(
@@ -1212,20 +1231,42 @@ void MainWindow::create_interface_() {
         simulation_scroll_area
     };
 
-    auto *simulation_form = new QFormLayout{
+    auto *simulation_fields_layout = new QVBoxLayout{
         simulation_content
     };
 
-    simulation_form->setContentsMargins(
+    simulation_fields_layout->setContentsMargins(
         4,
         2,
         8,
         2
     );
 
-    simulation_form->setHorizontalSpacing(10);
+    simulation_fields_layout->setSpacing(6);
 
-    simulation_form->setVerticalSpacing(7);
+    const auto make_simulation_subgroup = [&]() {
+        auto *subgroup = new QGroupBox{
+            simulation_content
+        };
+
+        subgroup->setFlat(false);
+
+        auto *form = new QFormLayout{
+            subgroup
+        };
+
+        form->setContentsMargins(8, 6, 8, 6);
+        form->setHorizontalSpacing(10);
+        form->setVerticalSpacing(5);
+        form->setRowWrapPolicy(QFormLayout::DontWrapRows);
+        form->setFieldGrowthPolicy(
+            QFormLayout::AllNonFixedFieldsGrow
+        );
+
+        simulation_fields_layout->addWidget(subgroup);
+
+        return form;
+    };
 
     dt_spin_ = make_double_spin_box(
         1.0e-8,
@@ -1304,6 +1345,12 @@ void MainWindow::create_interface_() {
         simulation_content
     };
 
+    mode_combo_->setSizeAdjustPolicy(
+        QComboBox::AdjustToMinimumContentsLengthWithIcon
+    );
+
+    mode_combo_->setMinimumContentsLength(8);
+
     mode_combo_->addItem(
         "Fast: final result only",
         false
@@ -1320,65 +1367,90 @@ void MainWindow::create_interface_() {
         "real progress updates."
     );
 
-    lookup_table_check_ = new QCheckBox(
-        "Approximate periodic force",
-        simulation_content
-    );
-
-    lookup_table_check_->setChecked(false);
-
-    lookup_table_check_->setToolTip(
-        "Use a linearly interpolated derivative table "
-        "with 16384 intervals per spatial period. "
-        "Available for periodic JSON potentials only. "
-        "This changes force evaluation and introduces "
-        "an interpolation error."
-    );
-
-    simulation_form->addRow(
-        "Mode",
-        mode_combo_
-    );
-
-    simulation_form->addRow(
-        "Force evaluation",
-        lookup_table_check_
-    );
-
-    simulation_form->addRow(
-        "dt",
-        dt_spin_
-    );
-
-    simulation_form->addRow(
-        "Total time",
-        total_time_spin_
-    );
-
-    simulation_form->addRow(
-        "Particles",
-        particles_spin_
-    );
-
-    simulation_form->addRow(
-        "Burn-in steps",
-        burn_in_spin_
-    );
-
-    simulation_form->addRow(
-        "Initial position x₀",
+    /*
+ * Поля должны помещаться в доступную ширину
+ * viewport, а не растягивать содержимое
+ * по ширине длинного текста или чисел.
+ */
+    const std::array<QWidget *, 8> simulation_fields{
+        mode_combo_,
+        seed_spin_,
+        workers_spin_,
+        total_time_spin_,
+        dt_spin_,
+        burn_in_spin_,
+        particles_spin_,
         x0_spin_
-    );
+    };
 
-    simulation_form->addRow(
-        "Seed",
-        seed_spin_
-    );
+    for (QWidget *field: simulation_fields) {
+        field->setMinimumWidth(0);
 
-    simulation_form->addRow(
-        "Workers",
-        workers_spin_
-    );
+        QSizePolicy policy = field->sizePolicy();
+
+        policy.setHorizontalPolicy(
+            QSizePolicy::Ignored
+        );
+
+        field->setSizePolicy(policy);
+    }
+
+    auto *execution_form = make_simulation_subgroup();
+
+    execution_form->addRow("Mode", mode_combo_);
+    execution_form->addRow("Seed", seed_spin_);
+    execution_form->addRow("Workers", workers_spin_);
+
+    auto *timing_form = make_simulation_subgroup();
+
+    timing_form->addRow("Total time", total_time_spin_);
+    timing_form->addRow("dt", dt_spin_);
+    timing_form->addRow("Burn-in steps", burn_in_spin_);
+
+    auto *ensemble_form = make_simulation_subgroup();
+
+    ensemble_form->addRow("Particles", particles_spin_);
+    ensemble_form->addRow("Initial position", x0_spin_);
+
+    // Keep input fields aligned across the three separate forms.
+    const std::array<QFormLayout *, 3> subgroup_forms{
+        execution_form,
+        timing_form,
+        ensemble_form
+    };
+
+    int label_width = 0;
+
+    for (QFormLayout *form: subgroup_forms) {
+        for (int row = 0; row < form->rowCount(); ++row) {
+            QLayoutItem *item = form->itemAt(
+                row,
+                QFormLayout::LabelRole
+            );
+
+            if (item && item->widget()) {
+                label_width = std::max(
+                    label_width,
+                    item->widget()->sizeHint().width()
+                );
+            }
+        }
+    }
+
+    for (QFormLayout *form: subgroup_forms) {
+        for (int row = 0; row < form->rowCount(); ++row) {
+            QLayoutItem *item = form->itemAt(
+                row,
+                QFormLayout::LabelRole
+            );
+
+            if (item && item->widget()) {
+                item->widget()->setMinimumWidth(label_width);
+            }
+        }
+    }
+
+    simulation_fields_layout->addStretch(1);
 
     simulation_scroll_area->setWidget(
         simulation_content
