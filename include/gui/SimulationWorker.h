@@ -1,8 +1,10 @@
 #ifndef BROWNIAN_MOTOR_SIMULATIONWORKER_H
 #define BROWNIAN_MOTOR_SIMULATIONWORKER_H
 #pragma once
+// INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include "core/PotentialDefinition.h"
+#include "core/InitialPositionDistribution.h"
 #include "modulations/ModulationSettings.h"
 
 #include <QObject>
@@ -61,6 +63,8 @@ struct SimulationRequest final {
     std::size_t lookup_intervals{16'384};
 
     ModulationSettings modulation;
+
+    InitialPositionDistribution initial_positions{};
 };
 
 class SimulationWorker final : public QObject {

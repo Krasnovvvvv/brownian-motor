@@ -1,8 +1,10 @@
 #ifndef BROWNIAN_MOTOR_LANGEVINSOLVERCPU_H
 #define BROWNIAN_MOTOR_LANGEVINSOLVERCPU_H
 #pragma once
+// INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include <algorithm>
+#include "core/InitialPositionDistribution.h"
 #include <atomic>
 #include <cmath>
 #include <concepts>
@@ -198,6 +200,8 @@ private:
         std::vector<double> x_wrapped;
         std::vector<double> x_at_burn_in;
         std::vector<double> integrated_drift;
+        double initial_mean_position{};
+        double initial_position_variance{};
 
         std::vector<std::mt19937> gaussian_rngs;
 
@@ -285,20 +289,41 @@ private:
     [[nodiscard]] SimulationState make_initial_state_() const {
         SimulationState state;
 
-        state.x_unwrapped.assign(
-            params_.n_particles,
-            params_.x0
-        );
+        if (params_.initial_positions.kind == InitialPositionKind::Point) {
+            state.x_unwrapped.assign(
+                params_.n_particles,
+                params_.x0
+            );
 
-        state.x_at_burn_in.assign(
-            params_.n_particles,
-            params_.x0
-        );
+            state.x_at_burn_in.assign(
+                params_.n_particles,
+                params_.x0
+            );
 
-        state.x_wrapped.assign(
-            params_.n_particles,
-            evaluation_coordinate_(params_.x0)
-        );
+            state.x_wrapped.assign(
+                params_.n_particles,
+                evaluation_coordinate_(params_.x0)
+            );
+
+            state.initial_mean_position = params_.x0;
+            state.initial_position_variance = 0.0;
+        } else {
+            state.x_unwrapped.resize(params_.n_particles);
+            state.x_wrapped.resize(params_.n_particles);
+            for (std::size_t p = 0; p < params_.n_particles; ++p) {
+                const double x = params_.initial_positions.sample(params_.x0, seeds_, p);
+                const double phase = evaluation_coordinate_(x);
+                if (!std::isfinite(phase)) {
+                    throw std::runtime_error("Non-finite initial evaluation coordinate");
+                }
+                state.x_unwrapped[p] = x;
+                state.x_wrapped[p] = phase;
+            }
+            state.x_at_burn_in = state.x_unwrapped;
+            const auto summary = summarize_initial_positions(state.x_unwrapped);
+            state.initial_mean_position = summary.mean;
+            state.initial_position_variance = summary.variance;
+        }
 
         state.gaussian_rngs.reserve(params_.n_particles);
 
@@ -515,6 +540,8 @@ private:
 
         EnsembleResult result;
         result.n_particles = params_.n_particles;
+        result.initial_mean_position = state.initial_mean_position;
+        result.initial_position_variance = state.initial_position_variance;
         result.has_trajectory = false;
         result.mean_x_final = mean_x_final;
 
@@ -572,6 +599,8 @@ private:
 
         EnsembleResult result;
         result.n_particles = params_.n_particles;
+        result.initial_mean_position = state.initial_mean_position;
+        result.initial_position_variance = state.initial_position_variance;
         result.has_trajectory = params_.store_trajectory;
 
         if (params_.store_trajectory) {
@@ -586,8 +615,8 @@ private:
         const double particle_count =
                 static_cast<double>(params_.n_particles);
 
-        double mean_x_burn_in = params_.x0;
-        double mean_x_current = params_.x0;
+        double mean_x_burn_in = state.initial_mean_position;
+        double mean_x_current = state.initial_mean_position;
 
         for (std::size_t batch_begin = 0;
              batch_begin < total_steps;

@@ -1,6 +1,7 @@
 #ifndef BROWNIAN_MOTOR_SEEDFACTORY_H
 #define BROWNIAN_MOTOR_SEEDFACTORY_H
 #pragma once
+// INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include <array>
 #include <cstddef>
@@ -11,7 +12,8 @@ class SeedFactory final {
 public:
     enum class Stream : std::uint32_t {
         GaussianThermal = 0xA341316Cu,
-        Dichotomic = 0xA5A5A5A5u
+        Dichotomic = 0xA5A5A5A5u,
+        InitialPosition = 0x6C8E9CF5u
     };
 
     explicit SeedFactory(std::uint32_t run_seed)

@@ -1,8 +1,10 @@
 #ifndef BROWNIAN_MOTOR_SIMULATIONPARAMS_H
 #define BROWNIAN_MOTOR_SIMULATIONPARAMS_H
 #pragma once
+// INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include <cmath>
+#include "core/InitialPositionDistribution.h"
 #include <cstddef>
 #include <stdexcept>
 
@@ -66,7 +68,11 @@ struct SimulationParams final {
      */
     std::size_t cancellation_check_steps{4'096};
 
+    InitialPositionDistribution initial_positions{};
+
     void validate() const {
+        initial_positions.validate(x0);
+
         if (!std::isfinite(dt) || dt <= 0.0) {
             throw std::invalid_argument("dt must be finite and > 0");
         }

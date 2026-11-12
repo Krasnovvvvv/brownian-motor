@@ -1,4 +1,7 @@
+// INITIAL_POSITION_DISTRIBUTIONS_V1
 #include "gui/MainWindow.h"
+#include "core/InitialPositionJson.h"
+#include "gui/InitialPositionPanel.h"
 
 #include <Qt>
 #include <QtGlobal>
@@ -1410,7 +1413,12 @@ void MainWindow::create_interface_() {
     auto *ensemble_form = make_simulation_subgroup();
 
     ensemble_form->addRow("Particles", particles_spin_);
-    ensemble_form->addRow("Initial position", x0_spin_);
+    initial_position_panel_ = new InitialPositionPanel{
+        x0_spin_,
+        simulation_content
+    };
+
+    ensemble_form->addRow(initial_position_panel_);
 
     // Keep input fields aligned across the three separate forms.
     const std::array<QFormLayout *, 3> subgroup_forms{
@@ -1831,7 +1839,8 @@ SimulationRequest MainWindow::request_from_controls_() const {
 
         .lookup_intervals = 16'384,
 
-        .modulation = modulation_panel_->settings()
+        .modulation = modulation_panel_->settings(),
+        .initial_positions = initial_position_panel_->settings()
     };
 }
 
@@ -1839,6 +1848,13 @@ bool MainWindow::validate_request_(
     const SimulationRequest &request,
     QString &error_message
 ) const {
+    try {
+        request.initial_positions.validate(request.x0);
+    } catch (const std::exception &exception) {
+        error_message = QString::fromUtf8(exception.what());
+        return false;
+    }
+
     if (request.dt <= 0.0) {
         error_message = "dt must be greater than zero.";
         return false;
@@ -2797,6 +2813,8 @@ void MainWindow::start_simulation_() {
                 "x0",
                 request.x0
             },
+            {"initial_position_distribution",
+                initial_position_to_json(request.initial_positions, request.x0)},
             {
                 "total_steps",
                 static_cast<qint64>(total_steps)
@@ -3572,6 +3590,16 @@ void MainWindow::use_builtin_potential_() {
 void MainWindow::update_potential_controls_(
     bool is_running
 ) {
+    if (initial_position_panel_) {
+        const bool ready = potential_state_ == PotentialState::Ready;
+        const bool periodic = !active_potential_definition_ ||
+            active_potential_definition_->profile.periodic;
+        const double period = active_potential_definition_
+            ? active_potential_definition_->profile.period : 1.0;
+        initial_position_panel_->set_period_available(ready && periodic, period);
+        initial_position_panel_->setEnabled(!is_running && ready);
+    }
+
     const bool validating =
             potential_state_ ==
             PotentialState::Validating;

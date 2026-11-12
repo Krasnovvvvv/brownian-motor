@@ -322,3 +322,27 @@ if (BUILD_TESTING)
     )
 
 endif()
+# Initial-coordinate distributions: existing targets remain unchanged.
+target_sources(brownian-motor PRIVATE
+    include/core/InitialPositionDistribution.h
+    include/core/InitialPositionJson.h
+    include/gui/InitialPositionPanel.h
+    src/gui/InitialPositionPanel.cpp
+)
+
+if (BUILD_TESTING)
+    find_package(Threads REQUIRED)
+    add_executable(initial-position-smoke-test
+        tests/InitialPositionSmokeTest.cpp
+    )
+    set_target_properties(initial-position-smoke-test PROPERTIES
+        AUTOMOC OFF
+        AUTOUIC OFF
+        AUTORCC OFF
+    )
+    target_include_directories(initial-position-smoke-test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_link_libraries(initial-position-smoke-test PRIVATE Threads::Threads)
+    add_test(NAME initial-position-smoke-test COMMAND initial-position-smoke-test)
+endif()

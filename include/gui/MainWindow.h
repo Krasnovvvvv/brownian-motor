@@ -1,6 +1,7 @@
 #ifndef BROWNIAN_MOTOR_MAINWINDOW_H
 #define BROWNIAN_MOTOR_MAINWINDOW_H
 #pragma once
+// INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include <QElapsedTimer>
 #include <QHash>
@@ -36,6 +37,7 @@ class SimulationWorker;
 struct SimulationRequest;
 class TrajectoryPlotWidget;
 class PotentialDropArea;
+class InitialPositionPanel;
 class ModulationPanel;
 
 class MainWindow final : public QMainWindow {
@@ -150,6 +152,7 @@ private:
     QDoubleSpinBox *dt_spin_{nullptr};
     QDoubleSpinBox *total_time_spin_{nullptr};
     QDoubleSpinBox *x0_spin_{nullptr};
+    InitialPositionPanel *initial_position_panel_{nullptr};
 
     QSpinBox *particles_spin_{nullptr};
     QSpinBox *burn_in_spin_{nullptr};

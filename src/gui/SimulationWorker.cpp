@@ -1,4 +1,6 @@
+// INITIAL_POSITION_DISTRIBUTIONS_V1
 #include "gui/SimulationWorker.h"
+#include "core/InitialPositionJson.h"
 
 #include <QString>
 
@@ -99,7 +101,8 @@ void SimulationWorker::run() {
             .batch_steps = request_.batch_steps,
 
             .cancellation_check_steps =
-            request_.cancellation_check_steps
+            request_.cancellation_check_steps,
+            .initial_positions = request_.initial_positions
         };
 
         simulation_params.validate();
@@ -474,6 +477,11 @@ void SimulationWorker::run() {
                 )
             }
         };
+
+        statistics.insert("initial_position_distribution",
+            initial_position_to_json(request_.initial_positions, request_.x0));
+        statistics.insert("initial_mean_position", result.initial_mean_position);
+        statistics.insert("initial_position_variance", result.initial_position_variance);
 
         if (result.has_velocity_statistics) {
             statistics.insert(

@@ -1,6 +1,7 @@
 #ifndef BROWNIAN_MOTOR_ENSEMBLERESULT_H
 #define BROWNIAN_MOTOR_ENSEMBLERESULT_H
 #pragma once
+// INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include <cstddef>
 #include <vector>
@@ -85,6 +86,10 @@ struct EnsembleResult final {
     double mean_thermal_velocity{
         std::numeric_limits<double>::quiet_NaN()
     };
+    // Actual initial finite-ensemble statistics, variance denominator N.
+    double initial_mean_position{0.0};
+    double initial_position_variance{0.0};
+
 };
 
 #endif // BROWNIAN_MOTOR_ENSEMBLERESULT_H
