@@ -1,9 +1,11 @@
 #ifndef BROWNIAN_MOTOR_SIMULATIONWORKER_H
 #define BROWNIAN_MOTOR_SIMULATIONWORKER_H
 #pragma once
+// INERTIAL_EXPONENTIAL_V1
 // INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include "core/PotentialDefinition.h"
+#include "core/DynamicsSettings.h"
 #include "core/InitialPositionDistribution.h"
 #include "modulations/ModulationSettings.h"
 
@@ -65,6 +67,7 @@ struct SimulationRequest final {
     ModulationSettings modulation;
 
     InitialPositionDistribution initial_positions{};
+    DynamicsSettings dynamics{};
 };
 
 class SimulationWorker final : public QObject {

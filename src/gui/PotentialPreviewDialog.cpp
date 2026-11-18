@@ -183,8 +183,8 @@ namespace {
         }
 
         const double padding = span > 0.0
-                ? 0.06 * span
-                : 0.05 * std::max(1.0, std::abs(minimum));
+                                   ? 0.06 * span
+                                   : 0.05 * std::max(1.0, std::abs(minimum));
 
         data.lower = minimum - padding;
         data.upper = maximum + padding;
@@ -325,12 +325,12 @@ namespace {
                     x_tick
                 );
                 painter.drawText(
-                QRectF{
-                    static_cast<double>(axis_label_height + 14),
-                    y - 0.5 * text_height - 2.0,
-                    plot.left() - axis_label_height - 24.0,
-                    static_cast<double>(text_height + 4)
-                },
+                    QRectF{
+                        static_cast<double>(axis_label_height + 14),
+                        y - 0.5 * text_height - 2.0,
+                        plot.left() - axis_label_height - 24.0,
+                        static_cast<double>(text_height + 4)
+                    },
                     Qt::AlignRight | Qt::AlignVCenter,
                     y_tick
                 );
@@ -338,7 +338,7 @@ namespace {
 
             QPainterPath curve;
             bool first = true;
-            for (const QPointF &point : data_.points) {
+            for (const QPointF &point: data_.points) {
                 const QPointF pixel{
                     plot.left() +
                     (point.x() / data_.period) * plot.width(),

@@ -1,5 +1,8 @@
+// INERTIAL_EXPONENTIAL_V1
 // INITIAL_POSITION_DISTRIBUTIONS_V1
 #include "gui/MainWindow.h"
+#include "core/DynamicsJson.h"
+#include "gui/DynamicsPanel.h"
 #include "core/InitialPositionJson.h"
 #include "gui/InitialPositionPanel.h"
 
@@ -1401,6 +1404,9 @@ void MainWindow::create_interface_() {
     auto *execution_form = make_simulation_subgroup();
 
     execution_form->addRow("Mode", mode_combo_);
+
+    dynamics_panel_ = new DynamicsPanel{simulation_content};
+    execution_form->addRow(dynamics_panel_);
     execution_form->addRow("Seed", seed_spin_);
     execution_form->addRow("Workers", workers_spin_);
 
@@ -1421,10 +1427,12 @@ void MainWindow::create_interface_() {
     ensemble_form->addRow(initial_position_panel_);
 
     // Keep input fields aligned across the three separate forms.
-    const std::array<QFormLayout *, 3> subgroup_forms{
+    const std::array<QFormLayout *, 5> subgroup_forms{
         execution_form,
         timing_form,
-        ensemble_form
+        ensemble_form,
+        dynamics_panel_->form_layout(),
+        initial_position_panel_->form_layout()
     };
 
     int label_width = 0;
@@ -1840,7 +1848,8 @@ SimulationRequest MainWindow::request_from_controls_() const {
         .lookup_intervals = 16'384,
 
         .modulation = modulation_panel_->settings(),
-        .initial_positions = initial_position_panel_->settings()
+        .initial_positions = initial_position_panel_->settings(),
+        .dynamics = dynamics_panel_->settings()
     };
 }
 
@@ -1850,6 +1859,7 @@ bool MainWindow::validate_request_(
 ) const {
     try {
         request.initial_positions.validate(request.x0);
+        request.dynamics.validate();
     } catch (const std::exception &exception) {
         error_message = QString::fromUtf8(exception.what());
         return false;
@@ -2813,8 +2823,11 @@ void MainWindow::start_simulation_() {
                 "x0",
                 request.x0
             },
-            {"initial_position_distribution",
-                initial_position_to_json(request.initial_positions, request.x0)},
+            {"dynamics", dynamics_to_json(request.dynamics)},
+            {
+                "initial_position_distribution",
+                initial_position_to_json(request.initial_positions, request.x0)
+            },
             {
                 "total_steps",
                 static_cast<qint64>(total_steps)
@@ -3416,6 +3429,7 @@ bool MainWindow::eventFilter(
 
 void MainWindow::set_running_state_(bool is_running) {
     cancel_button_->setEnabled(is_running);
+    dynamics_panel_->setEnabled(!is_running);
 
     mode_combo_->setEnabled(!is_running);
 
@@ -3593,9 +3607,10 @@ void MainWindow::update_potential_controls_(
     if (initial_position_panel_) {
         const bool ready = potential_state_ == PotentialState::Ready;
         const bool periodic = !active_potential_definition_ ||
-            active_potential_definition_->profile.periodic;
+                              active_potential_definition_->profile.periodic;
         const double period = active_potential_definition_
-            ? active_potential_definition_->profile.period : 1.0;
+                                  ? active_potential_definition_->profile.period
+                                  : 1.0;
         initial_position_panel_->set_period_available(ready && periodic, period);
         initial_position_panel_->setEnabled(!is_running && ready);
     }

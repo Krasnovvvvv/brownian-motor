@@ -1,6 +1,7 @@
 #ifndef BROWNIAN_MOTOR_MAINWINDOW_H
 #define BROWNIAN_MOTOR_MAINWINDOW_H
 #pragma once
+// INERTIAL_EXPONENTIAL_V1
 // INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include <QElapsedTimer>
@@ -37,6 +38,7 @@ class SimulationWorker;
 struct SimulationRequest;
 class TrajectoryPlotWidget;
 class PotentialDropArea;
+class DynamicsPanel;
 class InitialPositionPanel;
 class ModulationPanel;
 
@@ -160,6 +162,7 @@ private:
     QSpinBox *workers_spin_{nullptr};
 
     QComboBox *mode_combo_{nullptr};
+    DynamicsPanel *dynamics_panel_{nullptr};
     QCheckBox *lookup_table_check_{nullptr};
 
     QPushButton *run_button_{nullptr};

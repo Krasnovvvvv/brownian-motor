@@ -1,9 +1,11 @@
 #ifndef BROWNIAN_MOTOR_LANGEVINSOLVERCPU_H
 #define BROWNIAN_MOTOR_LANGEVINSOLVERCPU_H
 #pragma once
+// INERTIAL_EXPONENTIAL_V1
 // INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include <algorithm>
+#include "solver/ExponentialInertialStep.h"
 #include "core/InitialPositionDistribution.h"
 #include <atomic>
 #include <cmath>
@@ -49,6 +51,8 @@ public:
           , params_{params}
           , seeds_{seeds} {
         params_.validate();
+        if (params_.dynamics.inertial())
+            inertial_step_.emplace(params_.dt, params_.dynamics.inertia_ratio);
 
         if (requested_workers == 0) {
             requested_workers =
@@ -200,6 +204,10 @@ private:
         std::vector<double> x_wrapped;
         std::vector<double> x_at_burn_in;
         std::vector<double> integrated_drift;
+        std::vector<double> velocities, reference_velocity_difference;
+        std::vector<std::mt19937> bridge_rngs;
+        std::vector<std::normal_distribution<double> > bridge_distributions;
+        double initial_mean_velocity{}, initial_mean_squared_velocity{};
         double initial_mean_position{};
         double initial_position_variance{};
 
@@ -348,6 +356,31 @@ private:
             std::normal_distribution<double>{0.0, 1.0}
         );
 
+        if (params_.dynamics.inertial()) {
+            state.velocities.assign(params_.n_particles, 0.0);
+            state.reference_velocity_difference.assign(params_.n_particles, 0.0);
+            state.bridge_rngs.reserve(params_.n_particles);
+            state.bridge_distributions.assign(params_.n_particles,
+                                              std::normal_distribution<double>{0.0, 1.0});
+            long double sum = 0.0L, sumsq = 0.0L;
+            const double sigma = 1.0 / std::sqrt(params_.dynamics.inertia_ratio);
+            for (std::size_t p = 0; p < params_.n_particles; ++p) {
+                state.bridge_rngs.emplace_back(seeds_.make_mt19937(p, SeedFactory::Stream::InertialBridge));
+                if (params_.dynamics.initial_velocity == InitialVelocityKind::Thermal) {
+                    auto rng = seeds_.make_mt19937(p, SeedFactory::Stream::InitialVelocity);
+                    std::normal_distribution<double> normal{0.0, 1.0};
+                    state.velocities[p] = sigma * normal(rng);
+                }
+                const long double v = state.velocities[p];
+                sum += v;
+                sumsq += v * v;
+            }
+            state.initial_mean_velocity = static_cast<double>(sum / params_.n_particles);
+            state.initial_mean_squared_velocity = static_cast<double>(sumsq / params_.n_particles);
+            if (!std::isfinite(state.initial_mean_velocity) || !std::isfinite(state.initial_mean_squared_velocity))
+                throw std::runtime_error("Initial velocity moments are not finite");
+        }
+
         return state;
     }
 
@@ -467,6 +500,7 @@ private:
 
                             if (
                                 !advance_particle_(
+                                    state, particle,
                                     worker_potential,
                                     x_unwrapped,
                                     x_wrapped,
@@ -548,6 +582,7 @@ private:
         if (cancellation_requested.load(
             std::memory_order_acquire)) {
             result.mean_velocity = 0.0;
+            populate_inertial_observables_(result, state);
             return result;
         }
 
@@ -568,6 +603,7 @@ private:
             total_steps - burn_in_steps
         );
 
+        populate_inertial_observables_(result, state);
         return result;
     }
 
@@ -724,6 +760,7 @@ private:
 
                                 if (
                                     !advance_particle_(
+                                        state, particle,
                                         worker_potential,
                                         x_unwrapped,
                                         x_wrapped,
@@ -786,6 +823,7 @@ private:
                 std::memory_order_acquire)) {
                 result.mean_x_final = mean_x_current;
                 result.mean_velocity = 0.0;
+                populate_inertial_observables_(result, state);
                 return result;
             }
 
@@ -863,6 +901,7 @@ private:
             total_steps - burn_in_steps
         );
 
+        populate_inertial_observables_(result, state);
         return result;
     }
 
@@ -1116,7 +1155,64 @@ private:
                 true;
     }
 
+    void populate_inertial_observables_(EnsembleResult &result, const SimulationState &state) const {
+        if (!params_.dynamics.inertial()) return;
+        long double sum = 0.0L, sumsq = 0.0L;
+        for (double v: state.velocities) {
+            sum += v;
+            sumsq += static_cast<long double>(v) * v;
+        }
+        result.has_inertial_observables = true;
+        result.initial_mean_velocity = state.initial_mean_velocity;
+        result.initial_mean_squared_velocity = state.initial_mean_squared_velocity;
+        result.final_mean_velocity = static_cast<double>(sum / state.velocities.size());
+        result.final_mean_squared_velocity = static_cast<double>(sumsq / state.velocities.size());
+        if (!std::isfinite(result.final_mean_velocity) || !std::isfinite(result.final_mean_squared_velocity))
+            throw std::runtime_error("Final velocity moments are not finite");
+    }
+
+    [[nodiscard]] bool advance_inertial_(
+        SimulationState &state, std::size_t particle,
+        const Potential<Profile> &potential, double &x, double &phase,
+        std::mt19937 &rng, std::normal_distribution<double> &normal,
+        double factor, double &control, const char *&failure_reason
+    ) const noexcept {
+        try {
+            if (!std::isfinite(factor)) {
+                failure_reason = "inertial modulation factor is not finite";
+                return false;
+            }
+            const double force = -potential.derivative_value(phase, factor);
+            if (!std::isfinite(force)) {
+                failure_reason = "inertial force is not finite";
+                return false;
+            }
+            const double z1 = normal(rng);
+            const double z2 = state.bridge_distributions[particle](state.bridge_rngs[particle]);
+            const auto next = inertial_step_->advance(x, state.velocities[particle], force, z1, z2);
+            const auto cv = inertial_step_->advance_free_reference_control(
+                state.reference_velocity_difference[particle], force);
+            const double next_phase = evaluation_coordinate_(next.position);
+            const double next_control = control + cv.displacement_difference;
+            if (!std::isfinite(next_phase) || !std::isfinite(next_control)) {
+                failure_reason = "inertial phase or CV accumulator is not finite";
+                return false;
+            }
+            x = next.position;
+            phase = next_phase;
+            state.velocities[particle] = next.velocity;
+            // Carry this state through burn-in; reset only the displacement sum.
+            state.reference_velocity_difference[particle] = cv.velocity_difference;
+            control = next_control;
+            return true;
+        } catch (...) {
+            failure_reason = "inertial update overflow or invalid input";
+            return false;
+        }
+    }
+
     [[nodiscard]] bool advance_particle_(
+        SimulationState &state, std::size_t particle,
         const Potential<Profile> &potential,
         double &x_unwrapped,
         double &x_wrapped,
@@ -1128,6 +1224,11 @@ private:
         const char *&failure_reason
     ) const noexcept {
         failure_reason = nullptr;
+
+        if (params_.dynamics.inertial()) {
+            return advance_inertial_(state, particle, potential, x_unwrapped, x_wrapped,
+                                     gaussian_rng, gaussian_distribution, factor, integrated_drift, failure_reason);
+        }
 
         if (!std::isfinite(factor)) {
             failure_reason =
@@ -1312,6 +1413,7 @@ private:
         return x - std::floor(x);
     }
 
+    std::optional<ExponentialInertialStep> inertial_step_;
     Potential<Profile> potential_;
     SimulationParams params_;
     SeedFactory seeds_;

@@ -1,6 +1,7 @@
 #ifndef BROWNIAN_MOTOR_ENSEMBLERESULT_H
 #define BROWNIAN_MOTOR_ENSEMBLERESULT_H
 #pragma once
+// INERTIAL_EXPONENTIAL_V1
 // INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include <cstddef>
@@ -90,6 +91,11 @@ struct EnsembleResult final {
     double initial_mean_position{0.0};
     double initial_position_variance{0.0};
 
+    bool has_inertial_observables{false};
+    double initial_mean_velocity{0.0};
+    double initial_mean_squared_velocity{0.0};
+    double final_mean_velocity{0.0};
+    double final_mean_squared_velocity{0.0};
 };
 
 #endif // BROWNIAN_MOTOR_ENSEMBLERESULT_H

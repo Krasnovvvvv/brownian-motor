@@ -346,3 +346,12 @@ if (BUILD_TESTING)
     target_link_libraries(initial-position-smoke-test PRIVATE Threads::Threads)
     add_test(NAME initial-position-smoke-test COMMAND initial-position-smoke-test)
 endif()
+
+# Inertial dynamics: existing application and test targets remain unchanged.
+target_sources(brownian-motor PRIVATE
+    include/core/DynamicsSettings.h
+    include/core/DynamicsJson.h
+    include/solver/ExponentialInertialStep.h
+    include/gui/DynamicsPanel.h
+    src/gui/DynamicsPanel.cpp
+)

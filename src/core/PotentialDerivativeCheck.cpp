@@ -51,8 +51,9 @@ namespace {
     // First-order extrapolation from strictly inside an interval.
     double endpoint_limit(const ExpressionEvaluator &e, double lo, double hi, bool right) {
         const double endpoint = right ? hi : lo;
-        double x = right ? std::lerp(lo, hi, 1.0 - 1.0e-7)
-                         : std::lerp(lo, hi, 1.0e-7);
+        double x = right
+                       ? std::lerp(lo, hi, 1.0 - 1.0e-7)
+                       : std::lerp(lo, hi, 1.0e-7);
         if (!(lo < x && x < hi)) {
             x = std::nextafter(endpoint, right ? lo : hi);
         }
@@ -82,7 +83,7 @@ std::optional<std::string> check_potential_derivative(
         if (!std::isfinite(h) || h <= 0.0) {
             return "Derivative check: cannot choose a finite difference step.";
         }
-        for (const double t : points) {
+        for (const double t: points) {
             if (auto error = check_point(definition, evaluator, t * scale, h)) return error;
         }
         return std::nullopt;
@@ -104,7 +105,7 @@ std::optional<std::string> check_potential_derivative(
         const double hi = edges[i + 1];
         const double width = hi - lo;
         if (!std::isfinite(width) || width <= 0.0) return "Invalid piecewise interval.";
-        for (const double t : fractions) {
+        for (const double t: fractions) {
             const double x = std::lerp(lo, hi, t);
             const double margin = std::min(x - lo, hi - x);
             const double h = std::min(1.0e-5 * width, 0.25 * margin);

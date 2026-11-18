@@ -251,7 +251,7 @@ namespace {
             }
         } else if (
             !definition.profile
-                    .breakpoint_expressions.empty()
+            .breakpoint_expressions.empty()
         ) {
             throw std::invalid_argument{
                 "Breakpoint expressions require "
@@ -264,7 +264,7 @@ namespace {
 
         if (
             definition.profile
-                    .breakpoint_expressions.size() >
+            .breakpoint_expressions.size() >
             maximum_breakpoints
         ) {
             throw std::invalid_argument{
@@ -585,7 +585,7 @@ private:
 
         resolved_breakpoints.reserve(
             definition.profile
-                    .breakpoint_expressions.size()
+            .breakpoint_expressions.size()
         );
 
         double previous_breakpoint = 0.0;

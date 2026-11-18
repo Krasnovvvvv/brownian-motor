@@ -47,7 +47,8 @@ struct InitialPositionDistribution final {
             case InitialPositionKind::Gaussian:
                 if (!std::isfinite(mean) || !std::isfinite(standard_deviation) ||
                     standard_deviation <= 0.0) {
-                    throw std::invalid_argument("Gaussian initialization requires a finite mean and finite standard deviation > 0");
+                    throw std::invalid_argument(
+                        "Gaussian initialization requires a finite mean and finite standard deviation > 0");
                 }
                 return;
         }
@@ -99,17 +100,17 @@ struct InitialPositionSummary final {
     const std::vector<double> &positions
 ) {
     if (positions.empty()) throw std::invalid_argument("Initial ensemble is empty");
-    long double mean=0.0L, m2=0.0L;
-    std::size_t count=0;
-    for (const double x : positions) {
+    long double mean = 0.0L, m2 = 0.0L;
+    std::size_t count = 0;
+    for (const double x: positions) {
         if (!std::isfinite(x)) throw std::invalid_argument("Non-finite initial position");
         ++count;
-        const long double delta=static_cast<long double>(x)-mean;
-        mean += delta/static_cast<long double>(count);
-        m2 += delta*(static_cast<long double>(x)-mean);
+        const long double delta = static_cast<long double>(x) - mean;
+        mean += delta / static_cast<long double>(count);
+        m2 += delta * (static_cast<long double>(x) - mean);
     }
-    const double result_mean=static_cast<double>(mean);
-    const double result_variance=static_cast<double>(m2/static_cast<long double>(count));
+    const double result_mean = static_cast<double>(mean);
+    const double result_variance = static_cast<double>(m2 / static_cast<long double>(count));
     if (!std::isfinite(result_mean) || !std::isfinite(result_variance)) {
         throw std::runtime_error("Initial ensemble statistics overflow; reduce the initialization scale");
     }

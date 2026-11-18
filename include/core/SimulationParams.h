@@ -1,9 +1,11 @@
 #ifndef BROWNIAN_MOTOR_SIMULATIONPARAMS_H
 #define BROWNIAN_MOTOR_SIMULATIONPARAMS_H
 #pragma once
+// INERTIAL_EXPONENTIAL_V1
 // INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include <cmath>
+#include "core/DynamicsSettings.h"
 #include "core/InitialPositionDistribution.h"
 #include <cstddef>
 #include <stdexcept>
@@ -70,7 +72,10 @@ struct SimulationParams final {
 
     InitialPositionDistribution initial_positions{};
 
+    DynamicsSettings dynamics{};
+
     void validate() const {
+        dynamics.validate();
         initial_positions.validate(x0);
 
         if (!std::isfinite(dt) || dt <= 0.0) {

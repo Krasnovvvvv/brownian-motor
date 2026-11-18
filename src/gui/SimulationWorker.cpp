@@ -1,5 +1,7 @@
+// INERTIAL_EXPONENTIAL_V1
 // INITIAL_POSITION_DISTRIBUTIONS_V1
 #include "gui/SimulationWorker.h"
+#include "core/DynamicsJson.h"
 #include "core/InitialPositionJson.h"
 
 #include <QString>
@@ -102,7 +104,8 @@ void SimulationWorker::run() {
 
             .cancellation_check_steps =
             request_.cancellation_check_steps,
-            .initial_positions = request_.initial_positions
+            .initial_positions = request_.initial_positions,
+            .dynamics = request_.dynamics
         };
 
         simulation_params.validate();
@@ -479,9 +482,19 @@ void SimulationWorker::run() {
         };
 
         statistics.insert("initial_position_distribution",
-            initial_position_to_json(request_.initial_positions, request_.x0));
+                          initial_position_to_json(request_.initial_positions, request_.x0));
         statistics.insert("initial_mean_position", result.initial_mean_position);
         statistics.insert("initial_position_variance", result.initial_position_variance);
+
+        statistics.insert("dynamics", dynamics_to_json(request_.dynamics));
+        if (result.has_inertial_observables) {
+            statistics.insert("initial_mean_velocity", result.initial_mean_velocity);
+            statistics.insert("initial_mean_squared_velocity", result.initial_mean_squared_velocity);
+            statistics.insert("final_mean_velocity", result.final_mean_velocity);
+            statistics.insert("final_mean_squared_velocity", result.final_mean_squared_velocity);
+            statistics.insert("final_mean_kinetic_energy_dimensionless",
+                              0.5 * request_.dynamics.inertia_ratio * result.final_mean_squared_velocity);
+        }
 
         if (result.has_velocity_statistics) {
             statistics.insert(
@@ -588,9 +601,9 @@ void SimulationWorker::run() {
 
             statistics.insert(
                 "control_variate_method",
-                QStringLiteral(
-                    "same_thermal_noise_fixed_beta_1"
-                )
+                request_.dynamics.inertial()
+                    ? QStringLiteral("same_noise_free_inertial_reference_beta_1")
+                    : QStringLiteral("same_thermal_noise_fixed_beta_1")
             );
         }
 

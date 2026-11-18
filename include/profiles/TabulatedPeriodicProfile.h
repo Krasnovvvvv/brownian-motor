@@ -18,7 +18,8 @@ public:
     explicit TabulatedPeriodicProfile(
         ExactProfile exact_profile, double period, std::size_t intervals = 16'384
     ) : exact_profile_{std::move(exact_profile)},
-        table_{build_table_(exact_profile_, period, intervals)} {}
+        table_{build_table_(exact_profile_, period, intervals)} {
+    }
 
     [[nodiscard]] double operator()(double x) const noexcept { return exact_profile_(x); }
 
@@ -55,12 +56,13 @@ public:
     [[nodiscard]] double derivative_scaled(double x, double factor) const noexcept {
         return factor * derivative(x);
     }
+
     [[nodiscard]] double period() const noexcept { return table_->period; }
     [[nodiscard]] std::size_t intervals() const noexcept { return table_->intervals; }
     // Sample payload only, matching the previous meaning of this method.
     [[nodiscard]] std::size_t table_bytes() const noexcept {
         std::size_t count = table_->samples.size();
-        for (const auto &s : table_->segments) count += s.samples.size();
+        for (const auto &s: table_->segments) count += s.samples.size();
         return count * sizeof(double);
     }
 
@@ -72,6 +74,7 @@ private:
         bool constant{false};
         std::vector<double> samples;
     };
+
     struct Table final {
         double period{};
         double inverse_step{};
@@ -81,6 +84,7 @@ private:
         std::vector<double> breakpoints;
         std::vector<Segment> segments;
     };
+
     static double invalid_value_() noexcept { return std::numeric_limits<double>::quiet_NaN(); }
 
     static double sample_(const ExactProfile &profile, double x) {
@@ -123,7 +127,7 @@ private:
             table->samples.reserve(intervals + 1);
             for (std::size_t i = 0; i < intervals; ++i) {
                 table->samples.push_back(sample_(profile, period *
-                    (static_cast<double>(i) / static_cast<double>(intervals))));
+                                                          (static_cast<double>(i) / static_cast<double>(intervals))));
             }
             const double endpoint = sample_(profile, period);
             const double first = table->samples.front();
@@ -137,7 +141,7 @@ private:
 
         // Validate independently: ExactProfile need not be ExpressionEvaluator.
         std::vector<double> edges{0.0};
-        for (const double b : table->breakpoints) {
+        for (const double b: table->breakpoints) {
             if (!std::isfinite(b) || b <= edges.back() || b >= period) {
                 throw std::invalid_argument("Invalid lookup breakpoints");
             }
@@ -185,7 +189,7 @@ private:
             // Lossless compression of this sampled table, not a symbolic proof
             // that an arbitrary analytic expression is constant everywhere.
             s.constant = std::all_of(s.samples.begin(), s.samples.end(),
-                [&](double y) { return y == s.samples.front(); });
+                                     [&](double y) { return y == s.samples.front(); });
             if (s.constant) {
                 std::vector<double> compact{s.samples.front()};
                 s.samples.swap(compact);

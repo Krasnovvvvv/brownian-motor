@@ -46,21 +46,21 @@ InitialPositionPanel::InitialPositionPanel(
     kind_->addItem("Gaussian", static_cast<int>(InitialPositionKind::Gaussian));
     kind_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     kind_->setMinimumContentsLength(9);
-    auto combo_policy=kind_->sizePolicy();
+    auto combo_policy = kind_->sizePolicy();
     combo_policy.setHorizontalPolicy(QSizePolicy::Ignored);
     kind_->setSizePolicy(combo_policy);
     form->addRow("Initial distribution", kind_);
 
     point_->setParent(this);
-    point_label_=new QLabel{"Position", this};
-    lower_label_=new QLabel{"From", this};
-    upper_label_=new QLabel{"To", this};
-    mean_label_=new QLabel{"Mean", this};
-    sigma_label_=new QLabel{"Std. deviation", this};
-    lower_=make_initial_spin(this, 0.0);
-    upper_=make_initial_spin(this, 1.0);
-    mean_=make_initial_spin(this, 0.0);
-    sigma_=make_initial_spin(this, 0.1);
+    point_label_ = new QLabel{"Position", this};
+    lower_label_ = new QLabel{"From", this};
+    upper_label_ = new QLabel{"To", this};
+    mean_label_ = new QLabel{"Mean", this};
+    sigma_label_ = new QLabel{"Std. deviation", this};
+    lower_ = make_initial_spin(this, 0.0);
+    upper_ = make_initial_spin(this, 1.0);
+    mean_ = make_initial_spin(this, 0.0);
+    sigma_ = make_initial_spin(this, 0.1);
     sigma_->setRange(1.0e-12, 1.0e12);
 
     form->addRow(point_label_, point_);
@@ -69,7 +69,7 @@ InitialPositionPanel::InitialPositionPanel(
     form->addRow(mean_label_, mean_);
     form->addRow(sigma_label_, sigma_);
 
-    one_period_=new QPushButton{"One period", this};
+    one_period_ = new QPushButton{"One period", this};
     one_period_->setToolTip("Fill From = 0 and To = the current spatial period");
     form->addRow(one_period_);
 
@@ -86,34 +86,43 @@ InitialPositionPanel::InitialPositionPanel(
 
 InitialPositionDistribution InitialPositionPanel::settings() const {
     InitialPositionDistribution result;
-    result.kind=static_cast<InitialPositionKind>(kind_->currentData().toInt());
-    result.lower=lower_->value();
-    result.upper=upper_->value();
-    result.mean=mean_->value();
-    result.standard_deviation=sigma_->value();
+    result.kind = static_cast<InitialPositionKind>(kind_->currentData().toInt());
+    result.lower = lower_->value();
+    result.upper = upper_->value();
+    result.mean = mean_->value();
+    result.standard_deviation = sigma_->value();
     return result;
 }
 
 void InitialPositionPanel::set_period_available(bool available, double period) {
-    period_available_=available && std::isfinite(period) && period > 0.0 && period <= 1.0e12;
-    period_=period;
+    period_available_ = available && std::isfinite(period) && period > 0.0 && period <= 1.0e12;
+    period_ = period;
     if (period_available_) {
         // Avoid silently rounding a very small period to zero in the UI.
-        if (period < 1.0e-12) period_available_=false;
+        if (period < 1.0e-12) period_available_ = false;
     }
     update_fields_();
 }
 
 void InitialPositionPanel::update_fields_() {
-    const auto kind=static_cast<InitialPositionKind>(kind_->currentData().toInt());
-    const bool point=kind==InitialPositionKind::Point;
-    const bool uniform=kind==InitialPositionKind::Uniform;
-    const bool gaussian=kind==InitialPositionKind::Gaussian;
-    point_label_->setVisible(point); point_->setVisible(point);
-    lower_label_->setVisible(uniform); lower_->setVisible(uniform);
-    upper_label_->setVisible(uniform); upper_->setVisible(uniform);
-    mean_label_->setVisible(gaussian); mean_->setVisible(gaussian);
-    sigma_label_->setVisible(gaussian); sigma_->setVisible(gaussian);
+    const auto kind = static_cast<InitialPositionKind>(kind_->currentData().toInt());
+    const bool point = kind == InitialPositionKind::Point;
+    const bool uniform = kind == InitialPositionKind::Uniform;
+    const bool gaussian = kind == InitialPositionKind::Gaussian;
+    point_label_->setVisible(point);
+    point_->setVisible(point);
+    lower_label_->setVisible(uniform);
+    lower_->setVisible(uniform);
+    upper_label_->setVisible(uniform);
+    upper_->setVisible(uniform);
+    mean_label_->setVisible(gaussian);
+    mean_->setVisible(gaussian);
+    sigma_label_->setVisible(gaussian);
+    sigma_->setVisible(gaussian);
     one_period_->setVisible(uniform);
     one_period_->setEnabled(period_available_);
+}
+
+QFormLayout *InitialPositionPanel::form_layout() const noexcept {
+    return dynamic_cast<QFormLayout *>(layout());
 }

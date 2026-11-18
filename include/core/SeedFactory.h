@@ -1,6 +1,7 @@
 #ifndef BROWNIAN_MOTOR_SEEDFACTORY_H
 #define BROWNIAN_MOTOR_SEEDFACTORY_H
 #pragma once
+// INERTIAL_EXPONENTIAL_V1
 // INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include <array>
@@ -13,7 +14,9 @@ public:
     enum class Stream : std::uint32_t {
         GaussianThermal = 0xA341316Cu,
         Dichotomic = 0xA5A5A5A5u,
-        InitialPosition = 0x6C8E9CF5u
+        InitialPosition = 0x6C8E9CF5u,
+        InitialVelocity = 0x68E31DA4u,
+        InertialBridge = 0xB5297A4Du
     };
 
     explicit SeedFactory(std::uint32_t run_seed)

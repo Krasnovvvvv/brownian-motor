@@ -7,6 +7,7 @@
 
 class QComboBox;
 class QDoubleSpinBox;
+class QFormLayout;
 class QLabel;
 class QPushButton;
 
@@ -16,11 +17,16 @@ public:
         QDoubleSpinBox *point_position,
         QWidget *parent = nullptr
     );
+
     [[nodiscard]] InitialPositionDistribution settings() const;
+
+    [[nodiscard]] QFormLayout *form_layout() const noexcept;
+
     void set_period_available(bool available, double period);
 
 private:
     void update_fields_();
+
     QComboBox *kind_{};
     QDoubleSpinBox *point_{};
     QDoubleSpinBox *lower_{};
