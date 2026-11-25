@@ -1189,9 +1189,24 @@ private:
             }
             const double z1 = normal(rng);
             const double z2 = state.bridge_distributions[particle](state.bridge_rngs[particle]);
-            const auto next = inertial_step_->advance(x, state.velocities[particle], force, z1, z2);
+            const double v = state.velocities[particle];
+            const auto predicted = inertial_step_->advance(x, v, force, z1, z2);
+            const double predicted_phase = evaluation_coordinate_(predicted.position);
+            if (!std::isfinite(predicted_phase)) {
+                failure_reason = "inertial predicted phase is not finite";
+                return false;
+            }
+            const double predicted_force = -potential.derivative_value(predicted_phase, factor);
+            if (!std::isfinite(predicted_force)) {
+                failure_reason = "inertial predicted force is not finite";
+                return false;
+            }
+            const double effective_force = force == predicted_force
+                ? force : 0.5 * force + 0.5 * predicted_force;
+            const auto next = force == effective_force ? predicted
+                : inertial_step_->advance(x, v, effective_force, z1, z2);
             const auto cv = inertial_step_->advance_free_reference_control(
-                state.reference_velocity_difference[particle], force);
+                state.reference_velocity_difference[particle], effective_force);
             const double next_phase = evaluation_coordinate_(next.position);
             const double next_control = control + cv.displacement_difference;
             if (!std::isfinite(next_phase) || !std::isfinite(next_control)) {
