@@ -143,10 +143,34 @@ void SimulationWorker::run() {
          * Instantiate the solver for the selected profile type,
          * then dispatch to the selected modulation process.
          */
+        std::string cuda_device;
+        if (request_.use_cuda) {
+#ifdef BM_CUDA
+            if (request_.potential_definition && !request_.use_lookup_table)
+                throw std::invalid_argument(
+                    "CUDA does not support ExprTk formulas directly. Enable Approximate force for a periodic profile or select CPU.");
+            cuda_device = bm_cuda::device();
+#else
+            throw std::invalid_argument("This build has no CUDA support");
+#endif
+        }
         const auto solve_with_profile =
                 [&]<typename Profile>(
             Profile profile
         ) -> EnsembleResult {
+#ifdef BM_CUDA
+            bm_cuda::Config gpu_config{};
+            std::vector<bm_cuda::Segment> gpu_rows;
+            std::vector<double> gpu_samples;
+            if (request_.use_cuda) {
+                if constexpr (requires { profile.export_cuda(gpu_config, gpu_rows, gpu_samples); }) {
+                    profile.export_cuda(gpu_config, gpu_rows, gpu_samples);
+                } else if constexpr (requires { profile.V1; profile.V2; }) {
+                    gpu_config.v1 = profile.V1;
+                    gpu_config.v2 = profile.V2;
+                } else throw std::invalid_argument("Unsupported CUDA force backend");
+            }
+#endif
             Potential<Profile> potential{
                 std::move(profile)
             };
@@ -158,8 +182,28 @@ void SimulationWorker::run() {
                 request_.requested_workers
             };
 
+#ifdef BM_CUDA
+            const auto solve_gpu = [&](auto &modulation) {
+                return solver.solve_cuda(modulation, gpu_config, gpu_rows, gpu_samples,
+                                         request_.seed, observer, stop_token);
+            };
+            const auto solve_gpu_markov = [&](const DichotomicParams &p, double fa, double fb) {
+                const auto tr = DichotomicTransition::from(p);
+                gpu_config.stochastic = true;
+                gpu_config.paa = tr.p_aa;
+                gpu_config.pbb = tr.p_bb;
+                gpu_config.stationary = tr.p_a_stationary;
+                gpu_config.fa = fa;
+                gpu_config.fb = fb;
+                ConstantModulation dummy{0.0};
+                return solve_gpu(dummy);
+            };
+#endif
             const auto solve_deterministic =
                     [&](auto &modulation) -> EnsembleResult {
+#ifdef BM_CUDA
+                if (request_.use_cuda) return solve_gpu(modulation);
+#endif
                 if (request_.interactive_mode) {
                     return solver
                             .solve_deterministic_interactive(
@@ -190,6 +234,12 @@ void SimulationWorker::run() {
                                 request_.alpha
                             );
 
+#ifdef BM_CUDA
+                    if (request_.use_cuda)
+                        return solve_gpu_markov(modulation_params,
+                                                modulation_params.factor_for_sigma(modulation_params.sigma_a),
+                                                modulation_params.factor_for_sigma(modulation_params.sigma_b));
+#endif
                     auto modulations =
                             ModulationFactory::
                             make_dichotomic_ensemble(
@@ -220,6 +270,16 @@ void SimulationWorker::run() {
                      *
                      * Each particle receives its own process.
                      */
+#ifdef BM_CUDA
+                    if (request_.use_cuda) {
+                        const auto &m = request_.modulation;
+                        const DichotomicParams p{
+                            .sigma_a = 1., .sigma_b = -1.,
+                            .gamma_a = m.gamma_a, .gamma_b = m.gamma_b, .dt = request_.dt, .alpha = -1.
+                        };
+                        return solve_gpu_markov(p, m.factor_a, m.factor_b);
+                    }
+#endif
                     auto modulations =
                             ModulationFactory::
                             make_two_state_factor_ensemble(
@@ -256,19 +316,7 @@ void SimulationWorker::run() {
                         request_.modulation
                     };
 
-                    if (request_.interactive_mode) {
-                        return solver
-                                .solve_deterministic_interactive(
-                                    modulation,
-                                    observer,
-                                    stop_token
-                                );
-                    }
-
-                    return solver.solve_deterministic_fast(
-                        modulation,
-                        stop_token
-                    );
+                    return solve_deterministic(modulation);
                 }
 
                 case ModulationKind::Constant: {
@@ -486,6 +534,11 @@ void SimulationWorker::run() {
         statistics.insert("initial_mean_position", result.initial_mean_position);
         statistics.insert("initial_position_variance", result.initial_position_variance);
 
+        statistics.insert("compute_backend", QStringLiteral("cpu"));
+        if (request_.use_cuda) {
+            statistics.insert("compute_backend", QStringLiteral("cuda"));
+            statistics.insert("cuda_device", QString::fromStdString(cuda_device));
+        }
         statistics.insert("dynamics", dynamics_to_json(request_.dynamics));
         if (result.has_inertial_observables) {
             statistics.insert("initial_mean_velocity", result.initial_mean_velocity);

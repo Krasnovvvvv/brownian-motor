@@ -5,6 +5,9 @@
 // INITIAL_POSITION_DISTRIBUTIONS_V1
 
 #include <algorithm>
+#ifdef BM_CUDA
+#include "solver/CudaBackend.h"
+#endif
 #include "solver/ExponentialInertialStep.h"
 #include "core/InitialPositionDistribution.h"
 #include <atomic>
@@ -188,6 +191,73 @@ public:
     ) const {
         return solve_deterministic_fast(modulation, stop_token);
     }
+
+#ifdef BM_CUDA
+    template<ModulationProcess Modulation>
+    EnsembleResult solve_cuda(Modulation &modulation, bm_cuda::Config config,
+                              const std::vector<bm_cuda::Segment> &rows, const std::vector<double> &samples,
+                              unsigned long long seed, const SimulationObserver &observer,
+                              std::stop_token stop) const {
+        const auto total = params_.step_count();
+        const auto burn = std::min(params_.burn_in_steps, total - 1);
+        const auto n = params_.n_particles;
+        auto state = make_initial_state_();
+        std::vector<bm_cuda::Particle> particles(n);
+        config.h = params_.dt;
+        config.period = params_.spatial_period;
+        config.inertial = params_.dynamics.inertial();
+        config.xx = sqrt_2dt_;
+        if (inertial_step_) inertial_step_->export_coefficients(config);
+        for (std::size_t i = 0; i < n; ++i) {
+            const double x = state.x_unwrapped[i];
+            particles[i] = {x, config.inertial ? state.velocities[i] : 0., 0., x, 0.};
+        }
+        EnsembleResult result;
+        result.n_particles = n;
+        result.initial_mean_position = state.initial_mean_position;
+        result.initial_position_variance = state.initial_position_variance;
+        result.has_trajectory = params_.store_trajectory;
+        auto gpu = bm_cuda::create(config, rows.data(), rows.size(), samples.data(), samples.size(),
+                                   particles.data(), n, seed);
+        double factors[1024];
+        for (std::size_t at = 0; at < total;) {
+            if (stop.stop_requested()) return result;
+            const auto batch = params_.store_trajectory ? params_.batch_steps : total;
+            const auto count = std::min({std::size_t(1024), total - at, batch - at % batch});
+            for (std::size_t j = 0; j < count; ++j) factors[j] = modulation.step();
+            bm_cuda::advance(*gpu, factors, count, at, burn);
+            at += count;
+            if (at != total && (!params_.store_trajectory || at % batch)) continue;
+            bm_cuda::snapshot(*gpu, particles.data());
+            long double sx = 0, sd = 0;
+            for (const auto &p: particles) {
+                sx += p.x;
+                sd += p.x - p.xb;
+            }
+            result.mean_x_final = static_cast<double>(sx / n);
+            result.mean_velocity = at > burn ? static_cast<double>(sd / n) / ((at - burn) * params_.dt) : 0.;
+            if (params_.store_trajectory) {
+                result.sim_time.push_back(at * params_.dt);
+                result.mean_x.push_back(result.mean_x_final);
+                if (observer)
+                    observer(SimulationUpdate{
+                        at - 1, total, at * params_.dt,
+                        result.mean_x_final, result.mean_velocity
+                    });
+            }
+        }
+        for (std::size_t i = 0; i < n; ++i) {
+            const auto &p = particles[i];
+            state.x_unwrapped[i] = p.x;
+            state.x_at_burn_in[i] = p.xb;
+            state.integrated_drift[i] = p.cv;
+            if (config.inertial) state.velocities[i] = p.v;
+        }
+        populate_statistics_(result, state, total - burn);
+        populate_inertial_observables_(result, state);
+        return result;
+    }
+#endif
 
 private:
     struct NumericalFailure final {
@@ -1202,9 +1272,11 @@ private:
                 return false;
             }
             const double effective_force = force == predicted_force
-                ? force : 0.5 * force + 0.5 * predicted_force;
-            const auto next = force == effective_force ? predicted
-                : inertial_step_->advance(x, v, effective_force, z1, z2);
+                                               ? force
+                                               : 0.5 * force + 0.5 * predicted_force;
+            const auto next = force == effective_force
+                                  ? predicted
+                                  : inertial_step_->advance(x, v, effective_force, z1, z2);
             const auto cv = inertial_step_->advance_free_reference_control(
                 state.reference_velocity_difference[particle], effective_force);
             const double next_phase = evaluation_coordinate_(next.position);

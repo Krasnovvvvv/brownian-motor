@@ -66,6 +66,20 @@ public:
         return count * sizeof(double);
     }
 
+    template<class Config, class Segments>
+    void export_cuda(Config &c, Segments &rows, std::vector<double> &samples) const {
+        c.piecewise = table_->piecewise;
+        if (!c.piecewise) {
+            rows.push_back({0.0, table_->inverse_step, 0, table_->intervals, false});
+            samples = table_->samples;
+        } else {
+            for (const auto &s: table_->segments) {
+                rows.push_back({s.left, s.inverse_step, samples.size(), s.intervals, s.constant});
+                samples.insert(samples.end(), s.samples.begin(), s.samples.end());
+            }
+        }
+    }
+
 private:
     struct Segment final {
         double left{};

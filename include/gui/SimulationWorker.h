@@ -55,6 +55,7 @@ struct SimulationRequest final {
     std::size_t cancellation_check_steps{4'096};
 
     bool interactive_mode{false};
+    bool use_cuda{false};
 
     /*
     * Approximate derivative evaluation for periodic

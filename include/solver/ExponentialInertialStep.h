@@ -80,6 +80,18 @@ public:
         return result;
     }
 
+    template<class Config>
+    void export_coefficients(Config &c) const noexcept {
+        c.a = a_;
+        c.q = q_;
+        c.B = B_;
+        c.C = C_;
+        c.vx = vx_;
+        c.vy = vy_;
+        c.xx = xx_;
+        c.xy = xy_;
+    }
+
 private:
     double a_{}, q_{}, B_{}, C_{}, vx_{}, vy_{}, xx_{}, xy_{};
 };

@@ -80,6 +80,19 @@ if (MINGW)
     )
 endif()
 
+option(BM_ENABLE_CUDA "Build the CUDA simulation backend" OFF)
+if(BM_ENABLE_CUDA)
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    add_library(bm-cuda STATIC src/solver/CudaBackend.cu)
+    set_target_properties(bm-cuda PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON
+        AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    target_include_directories(bm-cuda PRIVATE include)
+    target_link_libraries(bm-cuda PUBLIC CUDA::cudart PRIVATE CUDA::curand)
+    target_link_libraries(brownian-motor PRIVATE bm-cuda)
+    target_compile_definitions(brownian-motor PRIVATE BM_CUDA=1)
+endif()
+
 target_include_directories(brownian-motor PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${EXPRTK_INCLUDE_DIR}

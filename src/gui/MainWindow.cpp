@@ -27,6 +27,9 @@
 #include <QLabel>
 #include <QLayout>
 #include <QMessageBox>
+#ifdef BM_CUDA
+#include "solver/CudaBackend.h"
+#endif
 #include <QPlainTextEdit>
 #include <QProgressBar>
 #include <QPushButton>
@@ -1476,6 +1479,23 @@ void MainWindow::create_interface_() {
         simulation_scroll_area
     );
 
+    cuda_check_ = new QCheckBox("Use CUDA", simulation_group);
+    simulation_group_layout->addWidget(cuda_check_);
+#ifdef BM_CUDA
+    connect(cuda_check_, &QCheckBox::toggled, this, [this](bool enabled) {
+        if (!enabled) return;
+        try {
+            cuda_check_->setToolTip(QString::fromStdString(bm_cuda::device()));
+        } catch (const std::exception &e) {
+            cuda_check_->setChecked(false);
+            QMessageBox::warning(this, "CUDA unavailable", QString::fromUtf8(e.what()));
+        }
+    });
+#else
+    cuda_check_->setEnabled(false);
+    cuda_check_->setToolTip("This build has no CUDA support");
+#endif
+
     parameters_layout->addWidget(
         simulation_group, 1
     );
@@ -1841,6 +1861,7 @@ SimulationRequest MainWindow::request_from_controls_() const {
         .batch_steps = 3'500,
         .cancellation_check_steps = 4'096,
         .interactive_mode = interactive_mode,
+        .use_cuda = cuda_check_->isChecked(),
 
         .use_lookup_table =
         lookup_table_check_->isChecked(),

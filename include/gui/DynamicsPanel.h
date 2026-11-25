@@ -13,6 +13,7 @@ public:
     explicit DynamicsPanel(QWidget *parent = nullptr);
 
     [[nodiscard]] DynamicsSettings settings() const;
+
     [[nodiscard]] QFormLayout *form_layout() const noexcept;
 
 private:

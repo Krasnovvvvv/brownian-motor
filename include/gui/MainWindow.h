@@ -164,6 +164,7 @@ private:
     QComboBox *mode_combo_{nullptr};
     DynamicsPanel *dynamics_panel_{nullptr};
     QCheckBox *lookup_table_check_{nullptr};
+    QCheckBox *cuda_check_{nullptr};
 
     QPushButton *run_button_{nullptr};
     QPushButton *cancel_button_{nullptr};
